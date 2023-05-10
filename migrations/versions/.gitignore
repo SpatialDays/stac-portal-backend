@@ -1,2 +1,0 @@
-*.py
-# we will ignore migrations in this folder, as we are going to manage them elsewhere
