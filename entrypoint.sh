@@ -40,6 +40,7 @@ migrate = Migrate()
 migrate.init_app(app, db)
 FLASK_APP = "manage.py"
 db.create_all()
+print("Database tables created")
 EOF
 
 FLASK_APP=manage.py python3 setup.py
