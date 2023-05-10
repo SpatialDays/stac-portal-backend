@@ -7,7 +7,7 @@ from flask_migrate import Migrate
 from app import blueprint
 from app.main import create_app, db
 
-app = create_app(os.getenv('FLASK_ENV') or 'dev')
+app = create_app() 
 app.register_blueprint(blueprint)
 app.app_context().push()
 CORS(app, resources={r"/*": {"origins": "*"}})

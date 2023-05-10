@@ -1,0 +1,13 @@
+version: '3'
+services:
+  app-sqlalchemy:
+    container_name: stac-portal-backend
+    image: abc
+    platform: linux/amd64
+    network_mode: host
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASS=
+      - POSTGRES_DBNAME=stacportaldb
+      - POSTGRES_HOST=
+      - POSTGRES_PORT=5432
