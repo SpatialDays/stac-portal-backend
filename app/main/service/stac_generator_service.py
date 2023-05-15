@@ -73,9 +73,6 @@ def create_STAC_Item(metadata):
     blob_url = f"https://{account_name}.blob.{endpoint_suffix}"
 
     for asset in metadata["assets"]:
-        # Remove extension from asset name
-        name = re.sub(r"\.[^.]*$", "", asset["filename"])
-
         href = (asset["href"],)
         href = href[0]
 
@@ -87,7 +84,7 @@ def create_STAC_Item(metadata):
             href = blob_url + href
 
         item.add_asset(
-            key=name,
+            key=asset["filename"],
             asset=pystac.Asset(
                 href=href,
                 media_type=asset["type"],  # TODO: Convert to pystac.MediaType
