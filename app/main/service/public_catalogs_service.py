@@ -4,6 +4,7 @@ from threading import Thread
 from typing import Dict, List
 
 import geoalchemy2
+import redis
 import requests
 import shapely
 import sqlalchemy
@@ -13,7 +14,7 @@ from shapely.geometry import box
 from sqlalchemy import or_
 
 from app.main.model.public_catalogs_model import PublicCatalog, PublicCollection
-from .status_reporting_service import make_stac_ingestion_status_entry, set_stac_ingestion_status_entry
+from .status_reporting_service import make_stac_ingestion_status_entry
 from .. import db
 from ..custom_exceptions import *
 from ..model.public_catalogs_model import StoredSearchParameters
@@ -432,6 +433,8 @@ def update_specific_collections_via_catalog_id(catalog_id: int,
 
 
 def _call_ingestion_microservice(parameters) -> int:
+    # TODO: parameters should really be passed separately, not as a dictionary containing everything
+    # TODO: now because of that we need to pop elements that are not STAC search parameters
     """
     Call the ingestion microservice to load collections into the database.
 
@@ -441,50 +444,80 @@ def _call_ingestion_microservice(parameters) -> int:
     :param parameters: STAC Filter parameters
     :return: Work session id which can be used to check the status of the ingestion
     """
-    souce_stac_catalog_url = parameters['source_stac_catalog_url']
+
+    """
+    example payload:
+    
+    {
+      "source_stac_catalog_url": "https://earth-search.aws.element84.com/v0/",
+      "target_stac_catalog_url": "http://localhost:8080",
+      "update": true,
+      "callback_id": "1234",
+      "stac_search_parameters": {
+        "bbox": [-1, 50, 1, 51],
+        "datetime": "2022-04-04T00:00:00Z/2022-05-05T00:00:00Z",
+        "collections": ["sentinel-s2-l2a"]
+      }
+    }
+
+    """
+    source_stac_catalog_url = parameters.pop('source_stac_catalog_url')
     target_stac_catalog_url = current_app.config['WRITE_STAC_API_SERVER']
-    update = parameters['update']
-    callback_id = make_stac_ingestion_status_entry(souce_stac_catalog_url, target_stac_catalog_url, update)
-    parameters['callback_id'] = callback_id
-    microservice_endpoint = current_app.config['STAC_SELECTIVE_INGESTER_ENDPOINT']
+    parameters.pop('target_stac_catalog_url')
+    update = parameters.pop('update')
+    callback_id = make_stac_ingestion_status_entry(source_stac_catalog_url, target_stac_catalog_url, update)
 
-    def run_async(_parameters, _app):
-        try:
-            response = requests.post(
-                microservice_endpoint,
-                json=_parameters, timeout=None)
-            if response.status_code != 200:
-                error_msg = response.text
-                with _app.app_context():
-                    set_stac_ingestion_status_entry(int(callback_id), error_message=error_msg)
-                    return
-            response_json = response.json()
-            newly_stored_collections = response_json['newly_stored_collections']
-            newly_stored_collections_count = response_json['newly_stored_collections_count']
-            updated_collections_count = response_json['updated_collections_count']
-            updated_collections = response_json['updated_collections']
-            newly_stored_items_count = response_json['newly_stored_items_count']
-            updated_items_count = response_json['updated_items_count']
-            already_stored_items_count = response_json['already_stored_items_count']
-            with _app.app_context():
-                set_stac_ingestion_status_entry(int(callback_id), newly_stored_collections_count,
-                                                newly_stored_collections,
-                                                updated_collections_count, updated_collections,
-                                                newly_stored_items_count,
-                                                updated_items_count, already_stored_items_count)
-            return response_json
+    payload = {
+        "source_stac_catalog_url": source_stac_catalog_url,
+        "target_stac_catalog_url": target_stac_catalog_url,
+        "update": update,
+        "callback_id": callback_id,
+        "stac_search_parameters": parameters
+    }
 
-        except Exception as e:
-            with _app.app_context():
-                err = str({
-                    "error": "Unable to reach ingestion microservice"
-                })
-                set_stac_ingestion_status_entry(int(callback_id), error_message=err)
-            logging.error("Error: " + str(e))
+    microservice_redis_key = "stac_selective_ingester_input_list"
+    redis_host = current_app.config['REDIS_HOST']
+    redis_port = current_app.config['REDIS_PORT']
+    redis_client = redis.Redis(host=redis_host, port=redis_port)
+    redis_client.rpush(microservice_redis_key, json.dumps(payload))
 
-    app = current_app._get_current_object()  # TODO: Is there a better way to do this?
-    thread = Thread(target=run_async, args=(parameters, app))
-    thread.start()
+    # def run_async(_parameters, _app):
+    #     try:
+    #         response = requests.post(
+    #             microservice_endpoint,
+    #             json=_parameters, timeout=None)
+    #         if response.status_code != 200:
+    #             error_msg = response.text
+    #             with _app.app_context():
+    #                 set_stac_ingestion_status_entry(int(callback_id), error_message=error_msg)
+    #                 return
+    #         response_json = response.json()
+    #         newly_stored_collections = response_json['newly_stored_collections']
+    #         newly_stored_collections_count = response_json['newly_stored_collections_count']
+    #         updated_collections_count = response_json['updated_collections_count']
+    #         updated_collections = response_json['updated_collections']
+    #         newly_stored_items_count = response_json['newly_stored_items_count']
+    #         updated_items_count = response_json['updated_items_count']
+    #         already_stored_items_count = response_json['already_stored_items_count']
+    #         with _app.app_context():
+    #             set_stac_ingestion_status_entry(int(callback_id), newly_stored_collections_count,
+    #                                             newly_stored_collections,
+    #                                             updated_collections_count, updated_collections,
+    #                                             newly_stored_items_count,
+    #                                             updated_items_count, already_stored_items_count)
+    #         return response_json
+    #
+    #     except Exception as e:
+    #         with _app.app_context():
+    #             err = str({
+    #                 "error": "Unable to reach ingestion microservice"
+    #             })
+    #             set_stac_ingestion_status_entry(int(callback_id), error_message=err)
+    #         logging.error("Error: " + str(e))
+    #
+    # app = current_app._get_current_object()  # TODO: Is there a better way to do this?
+    # thread = Thread(target=run_async, args=(parameters, app))
+    # thread.start()
     return callback_id
 
 
