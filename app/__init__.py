@@ -15,8 +15,7 @@ blueprint = Blueprint('api', __name__)
 api = Api(blueprint,
           title='STAC Portal',
           version='1.0',
-          description='Portal for accessing STAC PDA resources',
-          security='apikey')
+          description='A simple STAC Portal API')
 
 api.add_namespace(collection_ns, path='/private_catalog')
 api.add_namespace(validate_ns, path='/validate')
