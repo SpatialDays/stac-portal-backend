@@ -32,6 +32,8 @@ class ProductionConfig(Config):
     AZURE_STORAGE_BLOB_NAME_FOR_STAC_ITEMS = os.getenv("AZURE_STORAGE_BLOB_NAME_FOR_STAC_ITEMS")
     REDIS_HOST = os.getenv("REDIS_HOST")
     REDIS_PORT = int(os.getenv("REDIS_PORT"))
+    AD_CLIENT_ID = os.getenv("AD_CLIENT_ID")
+    AD_TENANT_ID = os.getenv("AD_TENANT_ID")
 
 
 
