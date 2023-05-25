@@ -1,3 +1,4 @@
+from flask import current_app
 import requests
 
 
@@ -15,7 +16,7 @@ def create_STAC_Item(data):
         Exception: If the API request fails for any reason.
     """
     try:
-        response = requests.post("http://localhost:8000/stac/generate", json=data)
+        response = requests.post(current_app.config["STAC_GENERATOR_ENDPOINT"], json=data)
         response.raise_for_status()
     except requests.exceptions.RequestException as err:
         print(f"Request failed: {err}")
