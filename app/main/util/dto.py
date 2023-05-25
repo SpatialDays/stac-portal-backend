@@ -338,70 +338,12 @@ class StacDto:
 
 class StacGeneratorDto:
     api = Namespace('stac_generator', description='stac generator related operations')
-    # Takes an array of metadata JSON
     stac_generator = api.model('stac_generator', {
-        'metadata': fields.List(fields.String, required=True, description='metadata json'),
-        'stac_version': fields.String(required=False, description='stac version', example='1.0.0'),
-        'stac_extensions': fields.List(fields.String, required=False, description='stac extensions', example=['eo']),
-        'stac_collection': fields.String(required=False, description='stac collection', example='landsat-8-l1-c1'),
+        'metadata': fields.List(fields.String, required=True, description='metadata JSON'),
+        'method': fields.String(required=True, description='method to use for stac generation'),
+        'gdalInfos': fields.List(fields.Nested(api.model('gdalInfo', {
+            'tiffUrl': fields.String(required=True, description='url of the tiff file'),
+            'gdalInfo': fields.Raw(required=True, description='gdalinfo of the tiff file')
+        })), required=False, description='gdalinfo of the tiff file'),
+        'files': fields.List(fields.String, required=False, description='files to be added to the stac'),
     })
-    item_search = api.model(
-        "item_search",
-        {
-            "collections": fields.List(
-                fields.String,
-                required=False,
-                default=[],
-                example=["landsat-8-l1-c1", "sentinel-2-l1c", "landsat-c2-l2"],
-            ),
-            "bbox": fields.List(
-                fields.Float,
-
-                required=False,
-                description="bounding box of the area to be ingested",
-                example=[-1, 50, 1, 51],
-            ),
-            "datetime": fields.String(
-                required=False,
-                description="datetime of the area to be ingested",
-                example="2021-05-05T00:00:00Z/2022-05-05T00:00:00Z",
-            ),
-            "ids": fields.List(
-                fields.String,
-                required=False,
-                default=[],
-                example=["LC08_L2SP_202024_20220810_20220812_02_T1_SR_B4"],
-            ),
-            "limit": fields.Integer(
-                required=False,
-                default=10,
-                description="maximum number of items to return",
-                example=10,
-            ),
-            "intersects": fields.String(
-                required=False,
-                description="geojson of the area to be ingested",
-                example="{}",
-            )},
-    )
-    collection_search = api.model(
-        "collection_search_2",
-        {
-            "collections": fields.List(
-                fields.String,
-                required=False,
-                default=[],
-                example=["landsat-8-l1-c1", "sentinel-2-l1c", "landsat-c2-l2"],
-            ),
-            "bbox": fields.List(
-                fields.Float,
-                required=False,
-                description="bounding box of the area to be ingested",
-                example=[-1, 50, 1, 51],
-            ),
-            "datetime": fields.String(
-                required=False,
-                description="datetime of the area to be ingested",
-                example="2021-05-05T00:00:00Z/2022-05-05T00:00:00Z",
-            )},
-    )
