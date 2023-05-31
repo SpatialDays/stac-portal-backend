@@ -3,8 +3,11 @@ import logging
 from flask import request
 from flask_restx import Resource
 
+from ..aad.auth_decorators import AuthDecorator
 from ..service.stac_generator_service import create_STAC_Item
 from ..util.dto import StacGeneratorDto
+
+auth_decorator = AuthDecorator()
 
 api = StacGeneratorDto.api
 
@@ -21,6 +24,9 @@ class StacGenerator(Resource):
     @api.response(200, "Success")
     @api.response(404, "File not found")
     @api.response(500, "Internal server error")
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Creator"]
+    )
     def post(self):
         """
         The POST method for the STAC Generator resource.
