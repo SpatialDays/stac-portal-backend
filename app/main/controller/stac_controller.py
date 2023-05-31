@@ -1,7 +1,10 @@
 from flask_restx import Resource
 
+from ..aad.auth_decorators import AuthDecorator
 from ..service.stac_service import *
 from ..util.dto import StacDto
+
+auth_decorator = AuthDecorator()
 
 api = StacDto.api
 
@@ -10,6 +13,9 @@ api = StacDto.api
 class CollectionsList(Resource):
     @api.doc(description="List all collections on the stac-api server")
     @api.response(200, "Success")
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
+    )
     def get(self):
         return get_all_collections(), 200
 
@@ -19,6 +25,9 @@ class Collection(Resource):
     @api.doc(description="get_collection")
     @api.response(200, "Success")
     @api.response(404, "Collection not found")
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
+    )
     def get(self, collection_id: str):
         try:
             return get_collection_by_id(collection_id), 200
@@ -34,6 +43,9 @@ class CollectionItems(Resource):
     @api.doc(description="get_collection_items")
     @api.response(200, "Success")
     @api.response(404, "Collection not found")
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
+    )
     def get(self, collection_id: str) -> Tuple[Dict[str, str], int]:
         try:
             return get_items_by_collection_id(collection_id), 200
@@ -50,6 +62,9 @@ class CollectionItem(Resource):
     @api.response(200, "Success")
     @api.response(404, "Collection not found")
     @api.response(404, "Item not found")
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
+    )
     def get(self, collection_id: str,
             item_id: str) -> Tuple[Dict[str, str], int]:
         try:
