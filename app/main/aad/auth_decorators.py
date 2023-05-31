@@ -7,6 +7,7 @@ from flask import request, abort
 from typing import Any, Callable, Dict, List
 from dotenv import load_dotenv
 import logging
+
 load_dotenv()
 
 
@@ -20,13 +21,18 @@ class AuthDecorator:
         """
         try:
             public_key = get_public_key(token)
-            decoded = jwt.decode(
+            decoded = jwt.api_jwt.decode_complete(
                 token,
                 public_key,
                 verify=True,
                 algorithms=["RS256"],
                 audience=[self.client_id],
                 issuer=self.issuer,
+                options={
+                    "verify_iat": False,
+                    "verify_exp": False,
+                    "verify_signature": True,
+                }
             )
             return decoded
         except Exception as e:
@@ -43,13 +49,11 @@ class AuthDecorator:
                 self.client_id = current_app.config["AD_CLIENT_ID"]
                 self.tenant_id = current_app.config["AD_TENANT_ID"]
                 self.issuer = f"https://login.microsoftonline.com/{self.tenant_id}/v2.0"
-                header_value = request.headers.get('Authorization')
-                
+                header_value = request.headers.get("Authorization")
+
                 if header_value:
                     # Extract the token from the header value
                     token = header_value[7:]
-                    print(f"Token is: {token}")
-                    
                     # Decode the token using auth_decorator.auth_token(token)
                     try:
                         decoded_token: Dict[str, Any] = self.auth_token(token)
@@ -57,12 +61,12 @@ class AuthDecorator:
                         # Return a 401 Unauthorized response
                         logging.info(f"Error decoding token: {e}")
                         abort(401)
-                    
+
                     # Extract the roles from the decoded token
-                    roles = decoded_token['roles']
-                    
+                    roles = decoded_token["roles"]
+
                     # Check if the user's role is allowed
-                    # could we do: 
+                    # could we do:
                     # authenticated = any(role in allowed_roles for role in roles)
                     authenticated = False
                     for i in roles:
@@ -70,7 +74,7 @@ class AuthDecorator:
                             if i == j:
                                 authenticated = True
                                 break
-                    
+
                     if not authenticated:
                         # Return a 401 Unauthorized response
                         abort(401)
