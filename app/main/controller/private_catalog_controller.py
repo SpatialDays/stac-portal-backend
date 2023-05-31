@@ -70,7 +70,10 @@ class CollectionsList(Resource):
             return {
                        "message": f"Error converting timestamp: {e}",
                    }, 400
-
+        
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
+    )
     def get(self):
         return private_catalog_service.get_all_collections(), 200
 
