@@ -6,7 +6,7 @@ from inspect import getfullargspec
 from flask import request, abort
 from typing import Any, Callable, Dict, List
 from dotenv import load_dotenv
-
+import logging
 load_dotenv()
 
 
@@ -48,12 +48,14 @@ class AuthDecorator:
                 if header_value:
                     # Extract the token from the header value
                     token = header_value[7:]
+                    print(f"Token is: {token}")
                     
                     # Decode the token using auth_decorator.auth_token(token)
                     try:
                         decoded_token: Dict[str, Any] = self.auth_token(token)
                     except Exception as e:
                         # Return a 401 Unauthorized response
+                        logging.info(f"Error decoding token: {e}")
                         abort(401)
                     
                     # Extract the roles from the decoded token
