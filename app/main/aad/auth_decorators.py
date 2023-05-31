@@ -60,7 +60,7 @@ class AuthDecorator:
                     except Exception as e:
                         # Return a 401 Unauthorized response
                         logging.info(f"Error decoding token: {e}")
-                        abort(401)
+                        abort(401,f"Error decoding token: {e}")
 
                     # Extract the roles from the decoded token
                     roles = decoded_token["roles"]
@@ -77,7 +77,7 @@ class AuthDecorator:
 
                     if not authenticated:
                         # Return a 401 Unauthorized response
-                        abort(401)
+                        abort(401,f"Role not allowed")
 
                     # Update kwargs with values from decoded_token
                     for arg_name in func_args:
@@ -88,7 +88,7 @@ class AuthDecorator:
                     return f(*args, **kwargs)
                 else:
                     # Return a 401 Unauthorized response
-                    abort(401)
+                    abort(401,"No Authorization header provided")
 
             return decorated_function
 
