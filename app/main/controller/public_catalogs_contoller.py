@@ -28,6 +28,9 @@ class PublicCatalogs(Resource):
     @api.response(201, "Success")
     @api.response(400, "Validation Error - Some elements are missing")
     @api.response(409, "Conflict - Catalog already exists")
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Creator"]
+    )
     def post(self):
         try:
             data = request.json
@@ -51,6 +54,9 @@ class PublicCatalogs(Resource):
 
     @api.doc(description="Delete all public catalogs from the database")
     @api.response(200, "Success")
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Creator"]
+    )
     def delete(self):
         public_catalogs_service.remove_all_public_catalogs()
         return {"message": "Deleted all catalogs"}, 200
@@ -60,6 +66,9 @@ class PublicCatalogs(Resource):
 class PublicCatalogsUpdate(Resource):
     @api.doc(description="Get all public catalogs and update them")
     @api.response(200, "Success")
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
+    )
     def get(self):
         public_catalogs_service.store_publicly_available_catalogs()
         return {"message": "Sync operation started"}, 200
@@ -69,6 +78,9 @@ class PublicCatalogsUpdate(Resource):
 class PublicCatalogsCollections(Resource):
     @api.doc("Get all public collections stored in the database")
     @api.response(200, "Success")
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
+    )
     def get(self):
         return (
             public_catalogs_service.get_all_stored_public_collections_as_list_of_dict()
@@ -80,6 +92,9 @@ class PublicCatalogsCollections(Resource):
     @api.doc(description="Get all collections of all public catalogs")
     @api.response(200, "Success")
     @api.expect(PublicCatalogsDto.collection_search, validate=True)
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Creator"]
+    )
     def post(self):
         spatial_extent: List[float] = request.json["bbox"]
         temporal_extent: str = request.json["datetime"]
@@ -97,6 +112,9 @@ class SpecificPublicCatalogCollections(Resource):
     @api.response(200, "Success")
     @api.response(404, "Not Found - Catalog does not exist")
     @api.expect(PublicCatalogsDto.collection_search, validate=True)
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Creator"]
+    )
     def post(self, public_catalog_id):
         spatial_extent: List[float] = request.json["bbox"]
         temporal_extent: str = request.json["datetime"]
@@ -117,6 +135,9 @@ class PublicCatalogLoadHistory(Resource):
     @api.doc(description="Get load history for specified public catalog")
     @api.response(200, "Success")
     @api.response(404, "Not Found - Catalog does not exist")
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
+    )
     def get(self, public_catalog_id):
         try:
             return (
@@ -136,6 +157,9 @@ class PublicCatalogCollections(Resource):
     @api.doc(description="Get all collections for specified public catalog")
     @api.response(200, "Success")
     @api.response(404, "Not Found - Catalog does not exist")
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
+    )
     def get(self, public_catalog_id):
         try:
             return (
@@ -155,6 +179,9 @@ class SpecificPublicCatalogCollection(Resource):
     @api.doc(description="Get specified collection for specified public catalog")
     @api.response(200, "Success")
     @api.response(404, "Not Found - Catalog or collection does not exist")
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Creator"]
+    )
     def delete(self, public_catalog_id, collection_id):
         try:
             public_catalogs_service.remove_collection_from_public_catalog(
@@ -178,6 +205,9 @@ class PublicCatalogsViaId(Resource):
     @api.doc(description="""Get the details of a public catalog by its id.""")
     @api.response(200, "Success")
     @api.response(404, "Public catalog not found")
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
+    )
     def get(self, public_catalog_id):
         try:
             return public_catalogs_service.get_public_catalog_by_id_as_dict(
@@ -190,6 +220,9 @@ class PublicCatalogsViaId(Resource):
     @api.doc(description="Remove a public catalog via its id")
     @api.response(200, "Success")
     @api.response(404, "Public catalog not found so it cant be removed")
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Creator"]
+    )
     def delete(self, public_catalog_id):
         try:
             return public_catalogs_service.remove_public_catalog_via_catalog_id(
@@ -204,6 +237,9 @@ class GetStacRecordsSpecifyingPublicCatalogId(Resource):
     @api.doc(description="""Get specific collections from catalog.""")
     @api.expect(PublicCatalogsDto.start_stac_ingestion, validate=True)
     @api.response(200, "Success")
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Creator"]
+    )
     def post(self, public_catalog_id):
         data = request.json
         try:
@@ -224,6 +260,9 @@ class GetStacRecordsSpecifyingPublicCatalogId(Resource):
 @api.route("/items/update/")
 class UpdateAllStacRecords(Resource):
     @api.doc(description="Update all stored stac records from all public catalogs")
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
+    )
     def get(self):
         try:
             result = public_catalogs_service.update_all_stac_records()
@@ -246,6 +285,9 @@ class UpdateStacRecordsSpecifyingPublicCatalogId(Resource):
     @api.doc(description="""Get all stac records from a public catalog.""")
     @api.response(200, "Success")
     @api.response(404, "Public catalog not found")
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
+    )
     def get(self, public_catalog_id):
         try:
             return public_catalogs_service.update_specific_collections_via_catalog_id(
@@ -263,6 +305,9 @@ class UpdateStacRecordsSpecifyingPublicCatalogId(Resource):
         PublicCatalogsDto.update_stac_collections_specify_collection_ids, validate=True
     )
     @api.response(200, "Success")
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Creator"]
+    )
     def post(self, public_catalog_id):
         collections_to_update = request.json["collections"]
         try:
@@ -289,6 +334,9 @@ class UpdateStacRecordsSpecifyingPublicCatalogId(Resource):
 class RunSearchParameters(Resource):
     @api.doc(description="Run search parameters for specified public catalog")
     @api.response(200, "Success")
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
+    )
     def get(self, parameter_id):
         try:
             return public_catalogs_service.run_search_parameters(parameter_id), 200

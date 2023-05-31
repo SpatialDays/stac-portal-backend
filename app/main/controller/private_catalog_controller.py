@@ -1,12 +1,15 @@
-from typing import Tuple, Dict
+from typing import Tuple, Dict, List
 
 from flask import request
 from flask_restx import Resource
 
+from ..aad.auth_decorators import AuthDecorator
 from ..custom_exceptions import *
 from ..service import private_catalog_service
 from ..service import stac_service
 from ..util.dto import PrivateCatalogDto
+
+auth_decorator = AuthDecorator()
 
 api = PrivateCatalogDto.api
 collections = PrivateCatalogDto.collection
@@ -17,6 +20,9 @@ collections = PrivateCatalogDto.collection
 class Collections(Resource):
     @api.doc(description='Search for collections in all catalogs')
     @api.response(200, 'Success')
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Creator"]
+    )
     def post(self):
         spatial_extent: List[float] = request.json['bbox']
         temporal_extent: str = request.json['datetime']
@@ -29,6 +35,9 @@ class CollectionsList(Resource):
     @api.expect(PrivateCatalogDto.collection_dto, validate=True)
     @api.response(200, "Success")
     @api.response(400, "Validation Error")
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Creator"]
+    )
     def post(self):
         try:
             return private_catalog_service.add_collection(request.json)
@@ -47,6 +56,9 @@ class CollectionsList(Resource):
     @api.response(400, "Validation Error")
     @api.response(404, "Collection not found")
     @api.response("4xx", "Stac API reported error")
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Creator"]
+    )
     def put(self):
         try:
             return private_catalog_service.update_collection(request.json), 200
@@ -58,7 +70,10 @@ class CollectionsList(Resource):
             return {
                        "message": f"Error converting timestamp: {e}",
                    }, 400
-
+        
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
+    )
     def get(self):
         return private_catalog_service.get_all_collections(), 200
 
@@ -68,6 +83,9 @@ class Collection(Resource):
     @api.doc(description="Remove private collection by id")
     @api.response(200, "Collection removed successfully.")
     @api.response(404, "Collection not found")
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Creator"]
+    )
     def delete(self, collection_id: str) -> Tuple[Dict[str, str], int]:
         try:
             return private_catalog_service.remove_collection(collection_id), 200
@@ -85,6 +103,9 @@ class CollectionItems(Resource):
     @api.response(403, "Unauthorized.")
     @api.response("4xx", "Stac API reported error")
     @api.expect(PrivateCatalogDto.item_dto, validate=True)
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Creator"]
+    )
     def post(self, collection_id):
         print(request.data)
         try:
@@ -110,6 +131,9 @@ class CollectionItem(Resource):
     @api.response(200, "Success")
     @api.response(403, "Unauthorized.")
     @api.expect(PrivateCatalogDto.item_dto, validate=True)
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Creator"]
+    )
     def put(self, collection_id: str, item_id: str):
         try:
             return stac_service.update_item_in_collection_on_stac_api(collection_id, item_id, request.json), 200
@@ -126,6 +150,9 @@ class CollectionItem(Resource):
     @api.response(200, "Success")
     @api.response(403, "Unauthorized.")
     @api.response("4xx", "Stac API reported error")
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Creator"]
+    )
     def delete(self, collection_id: str, item_id: str):
         try:
             return stac_service.remove_item_from_collection_on_stac_api(collection_id, item_id), 200
