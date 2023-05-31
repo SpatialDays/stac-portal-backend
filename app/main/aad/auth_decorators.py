@@ -28,11 +28,11 @@ class AuthDecorator:
                 algorithms=["RS256"],
                 audience=[self.client_id],
                 issuer=self.issuer,
-                options={
-                    "verify_iat": False,
-                    "verify_exp": False,
-                    "verify_signature": True,
-                }
+                # options={
+                #     "verify_iat": False,
+                #     "verify_exp": False,
+                #     "verify_signature": True,
+                # }
             )
             return decoded["payload"]
         except Exception as e:
