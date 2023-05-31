@@ -61,13 +61,13 @@ class AuthDecorator:
                     
                     # Check if the user's role is allowed
                     # could we do: 
-                    authenticated = any(role in allowed_roles for role in roles)
-                    # authenticated = False
-                    # for i in roles:
-                    #     for j in allowed_roles:
-                    #         if i == j:
-                    #             authenticated = True
-                    #             break
+                    # authenticated = any(role in allowed_roles for role in roles)
+                    authenticated = False
+                    for i in roles:
+                        for j in allowed_roles:
+                            if i == j:
+                                authenticated = True
+                                break
                     
                     if not authenticated:
                         # Return a 401 Unauthorized response
