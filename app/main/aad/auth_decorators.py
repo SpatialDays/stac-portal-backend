@@ -34,7 +34,7 @@ class AuthDecorator:
                     "verify_signature": True,
                 }
             )
-            return decoded
+            return decoded["payload"]
         except Exception as e:
             raise Exception(f"Error decoding token: {e}")
 
