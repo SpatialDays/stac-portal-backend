@@ -341,3 +341,7 @@ class StacGeneratorDto:
         })), required=False, description='gdalinfo of the tiff file'),
         'files': fields.List(fields.String, required=False, description='files to be added to the stac'),
     })
+
+
+class APIMDto:
+    api = Namespace('apim', description='apim related operations')
