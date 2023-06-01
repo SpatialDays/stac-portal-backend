@@ -263,14 +263,35 @@ class PublicCatalogsDto:
             "bbox": fields.List(
                 fields.Float,
                 required=False,
-                description="bounding box of the area to be ingested",
-                example=[-1, 50, 1, 51],
+                description="Bounding box coordinates as [min_lon, min_lat, max_lon, max_lat]",
+                example=[-1.4126994296859792, 52.4615055247506, -1.3391134071523503, 52.46111728714427],
+            ),
+            "intersects": fields.Raw(
+                required=False,
+                description="GeoJSON object representing the area to be ingested",
+                example={
+                    "type": "Feature",
+                    "properties": {},
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [
+                            [
+                                [-1.4126994296859792, 52.461505524750606],
+                                [-1.3391134071523503, 52.46111728714428],
+                                [-1.3397846693457625, 52.41616978039619],
+                                [-1.4132967460706072, 52.41655813854559],
+                                [-1.4126994296859792, 52.461505524750606]
+                            ]
+                        ]
+                    },
+                },
             ),
             "datetime": fields.String(
                 required=False,
                 description="datetime of the area to be ingested",
                 example="2021-05-05T00:00:00Z/2022-05-05T00:00:00Z",
-            )},
+            ),
+        },
     )
 
 

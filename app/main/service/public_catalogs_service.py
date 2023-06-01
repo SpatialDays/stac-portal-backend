@@ -9,8 +9,7 @@ import requests
 import shapely
 import sqlalchemy
 from flask import current_app
-from shapely.geometry import MultiPolygon
-from shapely.geometry import box
+from shapely.geometry import MultiPolygon, box, shape
 from sqlalchemy import or_
 
 from app.main.model.public_catalogs_model import PublicCatalog, PublicCollection
@@ -195,18 +194,24 @@ def _store_catalog_and_collections(title, url, summary) -> int or None:
         return _store_collections(already_existing_catalog)
 
 
-def search_collections(bbox: shapely.geometry.polygon.Polygon or List[float], time_interval_timestamp: str,
-                       public_catalog_id: int = None) -> Dict[str, any] or List[any]:
+def search_collections(spatial_extent: str or dict or List[float], time_interval_timestamp: str,
+                       public_catalog_id: int = None, bbox: bool = False) -> Dict[str, any] or List[any]:
     if public_catalog_id:
         try:
             get_public_catalog_by_id_as_dict(public_catalog_id)
         except CatalogDoesNotExistError:
             raise CatalogDoesNotExistError
 
-    if isinstance(bbox, list):
-        bbox = shapely.geometry.box(*bbox)
+    if bbox:
+        geom = box(*spatial_extent)
+    else: 
+        if isinstance(spatial_extent, str):
+            spatial_extent = json.loads(spatial_extent)
+        geom = shape(spatial_extent['geometry'])
+
     a = db.session.query(PublicCollection).filter(PublicCollection.spatial_extent.ST_Intersects(
-        f"SRID=4326;{bbox.wkt}"))
+        f"SRID=4326;{geom.wkt}"))
+
     if public_catalog_id:
         a = a.filter(PublicCollection.parent_catalog == public_catalog_id)
     time_start, time_end = process_timestamp.process_timestamp_dual_string(time_interval_timestamp)
