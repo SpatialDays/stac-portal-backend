@@ -2,12 +2,8 @@ version: '3'
 services:
   app-sqlalchemy:
     container_name: stac-portal-backend
-    image: abc
+    image: oseoinfraacrstaging.azurecr.io/stac-portal-backend:6363dd7
     platform: linux/amd64
     network_mode: host
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASS=
-      - POSTGRES_DBNAME=stacportaldb
-      - POSTGRES_HOST=
-      - POSTGRES_PORT=5432
+    env_file:
+      - .env
