@@ -4,12 +4,11 @@ from werkzeug.utils import secure_filename
 
 from ..aad.auth_decorators import AuthDecorator
 from ..service.file_service import *
-from ..util.dto import FileDto, FilesDto
+from ..util.dto import FileDto
 
 auth_decorator = AuthDecorator()
 
 api = FileDto.api
-files_api = FilesDto.files_api
 
 
 @api.route("/sas_token/<filename>/")

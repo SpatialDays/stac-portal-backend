@@ -312,12 +312,6 @@ class FileDto:
     file_upload.add_argument("file", location="files", type=FileStorage, required=True)
 
 
-class FilesDto:
-    files_api = Namespace('files', description='File upload related operations')
-    files_upload = files_api.parser()
-    files_upload.add_argument('files', location='files', type=FileStorage, required=True, action='append')
-
-
 class GdalInfoDto:
     api = Namespace("gdal_info", description="gdalinfo related operations")
     get_gdal_info = api.model(
