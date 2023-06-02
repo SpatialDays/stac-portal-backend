@@ -92,9 +92,9 @@ class PublicCatalogsCollections(Resource):
     @api.doc(description="Get all collections of all public catalogs")
     @api.response(200, "Success")
     @api.expect(PublicCatalogsDto.collection_search, validate=True)
-    # @auth_decorator.header_decorator(
-    #     allowed_roles=["StacPortal.Creator"]
-    # )
+    @auth_decorator.header_decorator(
+        allowed_roles=["StacPortal.Creator"]
+    )
     def post(self):
         spatial_extent_bbox: List[float] = request.json.get("bbox", None)
         spatial_extent_intersects: str or Dict = request.json.get("intersects", None)
