@@ -47,6 +47,14 @@ class RefreshAPIMToken(Resource):
         allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
     )
     def get(self,oid:str):
-        apim_token = f"{oid} apim_token"
 
-        return {"apim_token": apim_token}, 200
+        try:
+            regenerate_subscription_for_user(oid)
+            secrets = get_subscription_secrets_for_user(oid)
+            return {"secrets": secrets}, 200
+
+        except APIMSubscriptionKeyRefreshError:
+            return {"message": "Error refreshing subscription on APIM"}, 500
+
+        except APIMSubscriptionNotFoundError:
+            return {"message": "Error refreshing subscription on APIM"}, 500
