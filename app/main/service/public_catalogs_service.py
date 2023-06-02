@@ -194,20 +194,20 @@ def _store_catalog_and_collections(title, url, summary) -> int or None:
         return _store_collections(already_existing_catalog)
 
 
-def search_collections(spatial_extent: str or dict or List[float], time_interval_timestamp: str,
-                       public_catalog_id: int = None, bbox: bool = False) -> Dict[str, any] or List[any]:
+def search_collections(time_interval_timestamp: str, public_catalog_id: int = None, spatial_extent_intersects: str or Dict = None, 
+                       spatial_extent_bbox: List[float] = None,) -> Dict[str, any] or List[any]:
     if public_catalog_id:
         try:
             get_public_catalog_by_id_as_dict(public_catalog_id)
         except CatalogDoesNotExistError:
             raise CatalogDoesNotExistError
 
-    if bbox:
-        geom = box(*spatial_extent)
-    else: 
-        if isinstance(spatial_extent, str):
-            spatial_extent = json.loads(spatial_extent)
-        geom = shape(spatial_extent['geometry'])
+    if spatial_extent_bbox:
+        geom = box(*spatial_extent_bbox)
+    elif spatial_extent_intersects: 
+        if isinstance(spatial_extent_intersects, str):
+            spatial_extent_intersects = json.loads(spatial_extent_intersects)
+        geom = shape(spatial_extent_intersects['geometry'])
 
     a = db.session.query(PublicCollection).filter(PublicCollection.spatial_extent.ST_Intersects(
         f"SRID=4326;{geom.wkt}"))

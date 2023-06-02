@@ -1,6 +1,6 @@
 from flask import request
 from flask_restx import Resource
-from typing import List
+from typing import List, Dict
 
 from ..aad.auth_decorators import AuthDecorator
 from ..custom_exceptions import *
@@ -92,33 +92,34 @@ class PublicCatalogsCollections(Resource):
     @api.doc(description="Get all collections of all public catalogs")
     @api.response(200, "Success")
     @api.expect(PublicCatalogsDto.collection_search, validate=True)
-    @auth_decorator.header_decorator(
-        allowed_roles=["StacPortal.Creator"]
-    )
+    # @auth_decorator.header_decorator(
+    #     allowed_roles=["StacPortal.Creator"]
+    # )
     def post(self):
         spatial_extent_bbox: List[float] = request.json.get("bbox", None)
-        spatial_extent_intersects: str or dict = request.json.get("intersects", None)
+        spatial_extent_intersects: str or Dict = request.json.get("intersects", None)
 
         if not spatial_extent_bbox and not spatial_extent_intersects:
-            return {"error": "Either bbox or intersects is required"}, 400
+            return {"message": "Either bbox or intersects is required"}, 400
+
+        if spatial_extent_bbox and spatial_extent_intersects:
+            return {"message": "Only one of bbox or intersects is allowed"}, 400
 
         temporal_extent: str = request.json["datetime"]
 
         if spatial_extent_bbox:
             return (
                 public_catalogs_service.search_collections(
-                    spatial_extent_bbox,
                     temporal_extent,
-                    bbox=True
+                    spatial_extent_bbox=spatial_extent_bbox,
                 )
             ), 200
 
         if spatial_extent_intersects:
             return (
                 public_catalogs_service.search_collections(
-                    spatial_extent_intersects,
                     temporal_extent,
-                    bbox=False
+                    spatial_extent_intersects=spatial_extent_intersects,
                 )
             ), 200
 
@@ -133,12 +134,12 @@ class SpecificPublicCatalogCollections(Resource):
         allowed_roles=["StacPortal.Creator"]
     )
     def post(self, public_catalog_id):
-        spatial_extent: List[float] = request.json["bbox"]
+        spatial_extent_bbox: List[float] = request.json["bbox"]
         temporal_extent: str = request.json["datetime"]
         try:
             return (
                 public_catalogs_service.search_collections(
-                    spatial_extent, temporal_extent, public_catalog_id
+                    temporal_extent, public_catalog_id, spatial_extent_bbox=spatial_extent_bbox
                 )
             ), 200
         except CatalogDoesNotExistError:
