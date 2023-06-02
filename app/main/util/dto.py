@@ -312,12 +312,6 @@ class FileDto:
     file_upload.add_argument("file", location="files", type=FileStorage, required=True)
 
 
-class FilesDto:
-    files_api = Namespace('files', description='File upload related operations')
-    files_upload = files_api.parser()
-    files_upload.add_argument('files', location='files', type=FileStorage, required=True, action='append')
-
-
 class GdalInfoDto:
     api = Namespace("gdal_info", description="gdalinfo related operations")
     get_gdal_info = api.model(
@@ -347,3 +341,7 @@ class StacGeneratorDto:
         })), required=False, description='gdalinfo of the tiff file'),
         'files': fields.List(fields.String, required=False, description='files to be added to the stac'),
     })
+
+
+class APIMDto:
+    api = Namespace('apim', description='apim related operations')

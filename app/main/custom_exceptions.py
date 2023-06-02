@@ -64,3 +64,31 @@ class PrivateItemAlreadyExistsError(ItemAlreadyExistsError):
 
 class ItemDoesNotExistError(Error):
     pass
+
+
+class APIMUserAlreadyExistsError(Exception):
+    pass
+
+
+class APIMUserNotFoundError(Exception):
+    pass
+
+
+class APIMUserCreationError(Exception):
+    pass
+
+
+class APIMSubscriptionCreationError(Exception):
+    pass
+
+
+class APIMSubscriptionAlreadyExistsError(Exception):
+    pass
+
+
+class APIMSubscriptionNotFoundError(Exception):
+    pass
+
+
+class APIMSubscriptionKeyRefreshError(Exception):
+    pass
