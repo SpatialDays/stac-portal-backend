@@ -46,8 +46,6 @@ class AuthDecorator:
             @wraps(f)
             def decorated_function(*args, **kwargs):
                 enable_auth = current_app.config["AD_ENABLE_AUTH"]
-                print(f"enable_auth: {enable_auth}")
-                logging.info(f"enable_auth: {enable_auth}")
                 if not enable_auth:
                     return f(*args, **kwargs)
                 # Extract the Authorization header value
