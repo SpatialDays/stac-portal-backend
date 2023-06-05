@@ -1,12 +1,12 @@
 import jwt
-from .aadtoken import get_public_key
+import logging
 from flask import current_app
 from functools import wraps
 from inspect import getfullargspec
 from flask import request, abort
 from typing import Any, Callable, Dict, List
 from dotenv import load_dotenv
-import logging
+from .aadtoken import get_public_key
 
 load_dotenv()
 
@@ -60,38 +60,40 @@ class AuthDecorator:
                     # Decode the token using auth_decorator.auth_token(token)
                     try:
                         decoded_token: Dict[str, Any] = self.auth_token(token)
+                        roles = decoded_token["roles"]
+                        # Check if the user's role is allowed
+                        # could we do:
+                        # authenticated = any(role in allowed_roles for role in roles)
+                        authenticated = False
+                        for i in roles:
+                            for j in allowed_roles:
+                                if i == j:
+                                    authenticated = True
+                                    break
+
+                        if not authenticated:
+                            # Return a 401 Unauthorized response
+                            abort(401, f"Role not allowed")
+
+                        # Update kwargs with values from decoded_token
+                        for arg_name in func_args:
+                            if arg_name in decoded_token:
+                                kwargs[arg_name] = decoded_token[arg_name]
+
+                        # Call the original function with its arguments
+                        return f(*args, **kwargs)
+
+                    except KeyError:
+                        abort(401, "No roles specified in token for this AD User")
+
                     except Exception as e:
                         # Return a 401 Unauthorized response
-                        logging.info(f"Error decoding token: {e}")
-                        abort(401,f"Error decoding token: {e}")
+                        logging.error(f"Error decoding token: {e}")
+                        abort(401, f"Error decoding token: {e}")
 
-                    # Extract the roles from the decoded token
-                    roles = decoded_token["roles"]
-
-                    # Check if the user's role is allowed
-                    # could we do:
-                    # authenticated = any(role in allowed_roles for role in roles)
-                    authenticated = False
-                    for i in roles:
-                        for j in allowed_roles:
-                            if i == j:
-                                authenticated = True
-                                break
-
-                    if not authenticated:
-                        # Return a 401 Unauthorized response
-                        abort(401,f"Role not allowed")
-
-                    # Update kwargs with values from decoded_token
-                    for arg_name in func_args:
-                        if arg_name in decoded_token:
-                            kwargs[arg_name] = decoded_token[arg_name]
-
-                    # Call the original function with its arguments
-                    return f(*args, **kwargs)
                 else:
                     # Return a 401 Unauthorized response
-                    abort(401,"No Authorization header provided")
+                    abort(401, "No Authorization header provided")
 
             return decorated_function
 
