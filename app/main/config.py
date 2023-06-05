@@ -1,7 +1,8 @@
 import os
+import ast
 from dotenv import load_dotenv
-load_dotenv()
 
+load_dotenv()
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
@@ -34,12 +35,15 @@ class ProductionConfig(Config):
     REDIS_PORT = int(os.getenv("REDIS_PORT"))
     AD_CLIENT_ID = os.getenv("AD_CLIENT_ID")
     AD_TENANT_ID = os.getenv("AD_TENANT_ID")
+    AD_ENABLE_AUTH = bool(ast.literal_eval(os.getenv("AD_ENABLE_AUTH", "True")))  # set default to true not to break
+    # existing deployments
     APIM_CONFIG_APIM_TENANT_ID = os.getenv("APIM_CONFIG_APIM_TENANT_ID")
     APIM_CONFIG_APIM_SERVICE_PRINCIPAL_CLIENT_ID = os.getenv("APIM_CONFIG_APIM_SERVICE_PRINCIPAL_CLIENT_ID")
     APIM_CONFIG_APIM_SERVICE_PRINCIPAL_CLIENT_SECRET = os.getenv("APIM_CONFIG_APIM_SERVICE_PRINCIPAL_CLIENT_SECRET")
     APIM_CONFIG_APIM_SUBSCRIPTION_ID = os.getenv("APIM_CONFIG_APIM_SUBSCRIPTION_ID")
     APIM_CONFIG_APIM_RESOURCE_GROUP_NAME = os.getenv("APIM_CONFIG_APIM_RESOURCE_GROUP_NAME")
     APIM_CONFIG_APIM_NAME = os.getenv("APIM_CONFIG_APIM_NAME")
+
 
 config_by_name = dict(
     prod=ProductionConfig,
