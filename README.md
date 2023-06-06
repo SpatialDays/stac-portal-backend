@@ -17,7 +17,6 @@ Two build jobs are set up for building both prod and staging docker images.
 | POSTGRES_HOST                          | PostgreSQL host.                                                 |
 | POSTGRES_PORT                          | PostgreSQL port.                                                 |
 | POSTGRES_DBNAME                        | PostgreSQL database name.                                        |
-| SQLALCHEMY_DATABASE_URI                | Sqlalchemy string pointing to the PostgreSQL database.            |
 | READ_STAC_API_SERVER                   | Endpoint for the stac-fastapi instance used for read operations.   |
 | WRITE_STAC_API_SERVER                  | Endpoint for the stac-fastapi instance used for write operations.  |
 | STAC_VALIDATOR_ENDPOINT                | Endpoint for the STAC validator microservice.                      |
