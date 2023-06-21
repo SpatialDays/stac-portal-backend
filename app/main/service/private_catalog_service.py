@@ -9,7 +9,6 @@ from .stac_service import update_existing_collection_on_stac_api, create_new_col
     remove_private_collection_by_id_on_stac_api
 from .. import db
 from ..custom_exceptions import *
-from ..model.private_catalog_model import PrivateCollection
 from ..util import process_timestamp
 from ..util.process_timestamp import *
 

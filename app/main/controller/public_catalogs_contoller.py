@@ -1,6 +1,10 @@
+import json
+
 from flask import request
 from flask_restx import Resource
 from typing import List, Dict
+from flask import jsonify
+
 
 from ..aad.auth_decorators import AuthDecorator
 from ..custom_exceptions import *
@@ -21,7 +25,7 @@ class PublicCatalogs(Resource):
         allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
     )
     def get(self):
-        return public_catalogs_service.get_all_stored_public_catalogs_as_list_of_dict()
+        return public_catalogs_service.get_all_stored_public_catalogs()
 
     @api.doc(description="Store a new public catalog in the database")
     @api.expect(PublicCatalogsDto.add_public_catalog, validate=True)
@@ -67,7 +71,7 @@ class PublicCatalogsUpdate(Resource):
     @api.doc(description="Get all public catalogs and update them")
     @api.response(200, "Success")
     @auth_decorator.header_decorator(
-        allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
+        allowed_roles=["StacPortal.Creator"]
     )
     def get(self):
         public_catalogs_service.store_publicly_available_catalogs()
@@ -82,9 +86,7 @@ class PublicCatalogsCollections(Resource):
         allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
     )
     def get(self):
-        return (
-            public_catalogs_service.get_all_stored_public_collections_as_list_of_dict()
-        )
+        return public_catalogs_service.get_all_stored_public_collections_as_list_of_dict()
 
 
 @api.route("/collections/search/")

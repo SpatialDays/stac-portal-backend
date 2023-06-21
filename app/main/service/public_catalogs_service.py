@@ -1,8 +1,12 @@
+import functools
 import json
 import logging
+import urllib
 from threading import Thread
 from typing import Dict, List
-
+from stac_collection_search import search_collections as stac_search_collections
+from multiprocessing import Pool
+from functools import lru_cache
 import geoalchemy2
 import redis
 import requests
@@ -11,8 +15,16 @@ import sqlalchemy
 from flask import current_app
 from shapely.geometry import MultiPolygon, box, shape
 from sqlalchemy import or_
+from cachetools import cached, TTLCache
 
-from app.main.model.public_catalogs_model import PublicCatalog, PublicCollection
+cache = TTLCache(maxsize=1000, ttl=3600)
+from diskcache import Cache
+
+disk_cache = Cache('./cache')
+
+logging.basicConfig(level=logging.INFO)
+
+from app.main.model.public_catalogs_model import PublicCatalog
 from .status_reporting_service import make_stac_ingestion_status_entry
 from .. import db
 from ..custom_exceptions import *
@@ -56,27 +68,24 @@ def store_publicly_available_catalogs() -> None:
     :return: The number of catalogs stored
     """
     lookup_api: str = "https://stacindex.org/api/catalogs"
+    logging.info(f"Looking up stac index on {lookup_api}")
     response = requests.get(lookup_api)
     response_result = response.json()
     filtered_response_result = [i for i in response_result if i['isPrivate'] == False and i['isApi'] == True]
-    results = []
+    logging.info(f"Found {len(filtered_response_result)} public catalogs.")
 
-    def run_async(title, catalog_url, catalog_summary, results_list, app_for_context):
+    def run_async(title, catalog_url, catalog_summary, app_for_context):
         with app_for_context.app_context():
             try:
-                results_list.append(_store_catalog_and_collections(title, catalog_url, catalog_summary))
+                _store_catalog(title, catalog_url, catalog_summary)
             except:
-                results_list.append(None)
+                pass
+                # logging.error(f"Error storing catalog {title}.")
 
     app = current_app._get_current_object()  # TODO: Is there a better way to do this?
     for catalog in filtered_response_result:
-        t = Thread(target=run_async, args=(catalog['title'], catalog['url'], catalog['summary'], results, app))
+        t = Thread(target=run_async, args=(catalog['title'], catalog['url'], catalog['summary'], app))
         t.start()
-    # while len(results) < len(filtered_response_result):
-    #     time.sleep(0.1)
-    # number_of_catalogs = len([i for i in results if i is not None])
-    # number_of_collections = sum([i for i in results if i is not None])
-    # return number_of_catalogs, number_of_collections
 
 
 def remove_all_public_catalogs() -> None:
@@ -88,11 +97,29 @@ def remove_all_public_catalogs() -> None:
 
 
 def get_public_collections():
-    public_collections = PublicCollection.query.all()
-    out = []
-    for public_collection in public_collections:
-        out.append(public_collection.as_dict())
-    return out
+    # public_collections = PublicCollection.query.all()
+    # out = []
+    # for public_collection in public_collections:
+    #     out.append(public_collection.as_dict())
+    # return out
+    public_catalogs = PublicCatalog.query.all()
+    results = []
+    for public_catalog in public_catalogs:
+        catalog_url = public_catalog.url
+        all_collections_in_catalog = search_collections()
+
+
+def _get_collection_details_from_collection_url(collection_url: str) -> Dict[any, any]:
+    """
+    Get the details of a collection from the collection url.
+
+    :param collection_url: Url of the collection
+    :return: The collection details as a dict
+    """
+    response = requests.get(collection_url)
+    if response.status_code != 200:
+        raise PublicCollectionDoesNotExistError
+    return response.json()
 
 
 def _is_catalog_public_and_valid(url: str) -> bool:
@@ -117,65 +144,7 @@ def _is_catalog_public_and_valid(url: str) -> bool:
     return True
 
 
-def _store_collections(public_catalog_entry: PublicCatalog) -> int:
-    """
-    Store all collections for a catalog in the database.
-    :param public_catalog_entry: PublicCatalog object
-    :return: The number of collections stored
-    """
-    count_added = 0
-    try:
-        collections_for_new_catalog: List[
-            Dict[any, any]] = _get_all_available_collections_from_public_catalog(public_catalog_entry)
-        for collection in collections_for_new_catalog:
-            public_collection: PublicCollection
-            public_collection: PublicCollection = PublicCollection.query.filter_by(
-                parent_catalog=public_catalog_entry.id, id=collection['id']).first()
-            if public_collection:
-                pass
-
-            else:
-                public_collection: PublicCollection = PublicCollection()
-                public_collection.id = collection['id']
-            try:
-                public_collection.type = collection['type']
-            except KeyError:
-                public_collection.type = "Collection"
-            try:
-                public_collection.title = collection['title']
-            except KeyError:
-                public_collection.title = None
-            try:
-                public_collection.description = collection['description']
-            except:
-                public_collection.description = None
-            start_time_string = collection['extent']['temporal']['interval'][0][0]
-            end_time_string = collection['extent']['temporal']['interval'][0][1]
-            public_collection.temporal_extent_start = process_timestamp.process_timestamp_single_string(
-                start_time_string)
-            public_collection.temporal_extent_end = process_timestamp.process_timestamp_single_string(end_time_string)
-            bboxes = collection['extent']['spatial']['bbox']
-            shapely_boxes = []
-            for i in range(0, len(bboxes)):
-                shapely_box = box(*(collection['extent']['spatial']['bbox'][i]))
-                shapely_boxes.append(shapely_box)
-            shapely_multi_polygon = geoalchemy2.shape.from_shape(MultiPolygon(shapely_boxes), srid=4326)
-            public_collection.spatial_extent = shapely_multi_polygon
-            public_collection.parent_catalog = public_catalog_entry.id  # TODO: Rename to parent_catalog_id
-            db.session.add(public_collection)
-            count_added += 1
-        db.session.commit()
-
-    except ConvertingTimestampError:
-        db.session.commit()
-        raise ConvertingTimestampError
-    except KeyError:
-        db.session.commit()
-
-    return count_added
-
-
-def _store_catalog_and_collections(title, url, summary) -> int or None:
+def _store_catalog(title, url, summary) -> None:
     """
     Store a catalog and all its collections in the database.
 
@@ -185,17 +154,18 @@ def _store_catalog_and_collections(title, url, summary) -> int or None:
     :return: Number of collections stored, None if the catalog is not public or valid
     """
     if not _is_catalog_public_and_valid(url):
-        return None
+        raise PublicCatalogNotPublicOrValidError
     try:
         new_catalog: PublicCatalog = store_new_public_catalog(title, url, summary, return_as_dict=False)
-        return _store_collections(new_catalog)
+        logging.info(f"Storing catalog {title} with id {new_catalog.id}")
     except CatalogAlreadyExistsError:
-        already_existing_catalog: PublicCatalog = PublicCatalog.query.filter_by(url=url).first()
-        return _store_collections(already_existing_catalog)
+        logging.info(f"Catalog {title} already exists.")
+        raise CatalogAlreadyExistsError
 
 
-def search_collections(time_interval_timestamp: str, public_catalog_id: int = None, spatial_extent_intersects: str or Dict = None, 
-                       spatial_extent_bbox: List[float] = None,) -> Dict[str, any] or List[any]:
+def search_collections(time_interval_timestamp: str, public_catalog_id: int = None,
+                       spatial_extent_intersects: str or Dict = None,
+                       spatial_extent_bbox: List[float] = None, ) -> Dict[str, any] or List[any]:
     if public_catalog_id:
         try:
             get_public_catalog_by_id_as_dict(public_catalog_id)
@@ -204,7 +174,7 @@ def search_collections(time_interval_timestamp: str, public_catalog_id: int = No
 
     if spatial_extent_bbox:
         geom = box(*spatial_extent_bbox)
-    elif spatial_extent_intersects: 
+    elif spatial_extent_intersects:
         if isinstance(spatial_extent_intersects, str):
             spatial_extent_intersects = json.loads(spatial_extent_intersects)
         geom = shape(spatial_extent_intersects['geometry'])
@@ -265,13 +235,80 @@ def get_collections_from_public_catalog_id(public_catalog_id: int):
     return out
 
 
+# @lru_cache(maxsize=None)  # Python 3.9 or later users can use @cache
+# @cached(cache)
+@disk_cache.memoize()
+def get_collection(collections_url: str):
+    logging.info(f"Getting collections from {collections_url}")
+    headers = {
+        "Content-Type": "application/geo+json"
+    }
+    response = requests.get(collections_url, headers=headers)
+    response_result = response.json()
+    collections = response_result['collections']
+    to_return = []
+    for collection in collections:
+        spatial_extent = shapely.geometry.MultiPolygon([
+            shapely.geometry.box(*spatial_extent)
+            for spatial_extent in collection["extent"]["spatial"]["bbox"]
+        ])
+
+        to_return.append(
+            {
+                "id": collection["id"],
+                "title": collection["title"],
+                "type": collection["type"] if "type" in collection else "Collection",
+                "description": collection["description"],
+                "temporal_extent_start": collection["extent"]["temporal"]["interval"][0][0],
+                "temporal_extent_end": collection["extent"]["temporal"]["interval"][-1][1],
+                "spatial_extent_wkt": spatial_extent.wkt
+            }
+        )
+    return to_return
+
+
+
 def get_all_stored_public_collections_as_list_of_dict():
-    public_collections = PublicCollection.query.all()
+    all_public_catalogs = PublicCatalog.query.all()
     out = []
-    for public_collection in public_collections:
-        out.append(public_collection.as_dict())
+    pool = Pool()  # You can specify the number of processes to use here. Default is CPU count.
+
+    def handle_result(result, public_catalog_id):
+        for i in result:
+            i["parent_catalog"] = public_catalog_id
+            out.append(i)
+
+    for public_catalog in all_public_catalogs:
+        public_catalog_url = public_catalog.url
+        logging.info(f"Catalog url: {public_catalog_url}")
+        # if catalog_url does not end with a slash, add it
+        if not public_catalog_url.endswith('/'):
+            public_catalog_url = public_catalog_url + '/'
+        collections_url = urllib.parse.urljoin(public_catalog_url, 'collections')
+        pool.apply_async(get_collection, args=(collections_url,),
+                         callback=functools.partial(handle_result, public_catalog_id=public_catalog.id))
+
+    pool.close()
+    pool.join()
+
     return out
 
+# def get_all_stored_public_collections_as_list_of_dict():
+#     all_public_catalogs = PublicCatalog.query.all()
+#     out = []
+#     for public_catalog in all_public_catalogs:
+#         public_catalog_url = public_catalog.url
+#         logging.info(f"Catalog url: {public_catalog_url}")
+#         # if catalog_url does not end with a slash, add it
+#         if not public_catalog_url.endswith('/'):
+#             public_catalog_url = public_catalog_url + '/'
+#         collections_url = urllib.parse.urljoin(public_catalog_url, 'collections')
+#         collections = get_collection(collections_url)
+#         for i in collections:
+#             i["parent_catalog"] = public_catalog.id
+#
+#             out.append(i)
+#     return out
 
 def _get_all_available_collections_from_public_catalog(public_catalogue_entry: PublicCatalog) -> List[Dict[
     any, any]]:
@@ -322,7 +359,7 @@ def _get_all_available_collections_from_public_catalog(public_catalogue_entry: P
     return collections_to_return
 
 
-def get_all_stored_public_catalogs_as_list_of_dict() -> List[Dict[any, any]]:
+def get_all_stored_public_catalogs() -> List[Dict[any, any]]:
     """
     Get all stored public catalogs as a list of dictionaries.
     :return: Public catalogs as a list of dictionaries
