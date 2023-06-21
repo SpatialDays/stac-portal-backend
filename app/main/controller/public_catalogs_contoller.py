@@ -86,7 +86,7 @@ class PublicCatalogsCollections(Resource):
         allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
     )
     def get(self):
-        return public_catalogs_service.get_all_stored_public_collections_as_list_of_dict()
+        return public_catalogs_service.get_all_available_public_collections()
 
 
 @api.route("/collections/search/")
@@ -136,12 +136,13 @@ class SpecificPublicCatalogCollections(Resource):
         allowed_roles=["StacPortal.Creator"]
     )
     def post(self, public_catalog_id):
-        spatial_extent_bbox: List[float] = request.json["bbox"]
+        spatial_extent_bbox: List[float] = request.json.get("bbox", None)
+        spatial_extent_intersects: str or Dict = request.json.get("intersects", None)
         temporal_extent: str = request.json["datetime"]
         try:
             return (
                 public_catalogs_service.search_collections(
-                    temporal_extent, public_catalog_id, spatial_extent_bbox=spatial_extent_bbox
+                    temporal_extent, public_catalog_id, spatial_extent_bbox=spatial_extent_bbox, spatial_extent_intersects=spatial_extent_intersects
                 )
             ), 200
         except CatalogDoesNotExistError:

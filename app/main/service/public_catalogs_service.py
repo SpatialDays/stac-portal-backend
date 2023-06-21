@@ -4,20 +4,17 @@ import logging
 import urllib
 from threading import Thread
 from typing import Dict, List
-from stac_collection_search import search_collections as stac_search_collections
+from urllib.parse import urljoin
+
+from stac_collection_search import search_collections_verbose as search_collections_on_stac_api
 from multiprocessing import Pool
-from functools import lru_cache
-import geoalchemy2
 import redis
 import requests
 import shapely
 import sqlalchemy
 from flask import current_app
-from shapely.geometry import MultiPolygon, box, shape
-from sqlalchemy import or_
+from shapely.geometry import box, shape
 from cachetools import cached, TTLCache
-
-cache = TTLCache(maxsize=1000, ttl=3600)
 
 logging.basicConfig(level=logging.INFO)
 
@@ -93,32 +90,7 @@ def remove_all_public_catalogs() -> None:
     db.session.commit()
 
 
-def get_public_collections():
-    # public_collections = PublicCollection.query.all()
-    # out = []
-    # for public_collection in public_collections:
-    #     out.append(public_collection.as_dict())
-    # return out
-    public_catalogs = PublicCatalog.query.all()
-    results = []
-    for public_catalog in public_catalogs:
-        catalog_url = public_catalog.url
-        all_collections_in_catalog = search_collections()
-
-
-def _get_collection_details_from_collection_url(collection_url: str) -> Dict[any, any]:
-    """
-    Get the details of a collection from the collection url.
-
-    :param collection_url: Url of the collection
-    :return: The collection details as a dict
-    """
-    response = requests.get(collection_url)
-    if response.status_code != 200:
-        raise PublicCollectionDoesNotExistError
-    return response.json()
-
-
+@cached(TTLCache(maxsize=1000, ttl=3600))
 def _is_catalog_public_and_valid(url: str) -> bool:
     """
     Check if a catalog is public and valid.
@@ -160,15 +132,39 @@ def _store_catalog(title, url, summary) -> None:
         raise CatalogAlreadyExistsError
 
 
-def search_collections(time_interval_timestamp: str, public_catalog_id: int = None,
-                       spatial_extent_intersects: str or Dict = None,
-                       spatial_extent_bbox: List[float] = None, ) -> Dict[str, any] or List[any]:
-    if public_catalog_id:
-        try:
-            get_public_catalog_by_id_as_dict(public_catalog_id)
-        except CatalogDoesNotExistError:
-            raise CatalogDoesNotExistError
+@cached(TTLCache(maxsize=1000, ttl=3600))
+def get_collections_for_public_catalog(public_catalog, spatial_extent, time_start, time_end):
+    collections_url = urljoin(public_catalog.url, 'collections')
+    logging.info(f"Searching collections on {collections_url}")
+    headers = {
+        "Content-Type": "application/geo+json"
+    }
+    try:
+        response = requests.get(collections_url, headers=headers)
+        if response.status_code != 200:
+            logging.info(f"Error searching collections on {collections_url}")
+            return None
+    except Exception as e:
+        logging.info(f"Error searching collections on {collections_url}")
+        logging.info(f"Error message: {e}")
+        return None
 
+    response_as_json_dict = response.json()
+    logging.info(f"Found {len(response_as_json_dict['collections'])} collections on {collections_url}")
+    results = search_collections_on_stac_api(response_as_json_dict, spatial_extent=spatial_extent,
+                                             temporal_extent_start=time_start, temporal_extent_end=time_end)
+
+    data = []
+    for result in results:
+        result['parent_catalog'] = public_catalog.id
+        data.append(result)
+    return data
+
+
+# @cached(TTLCache(maxsize=1000, ttl=3600))
+def search_collections(time_interval_timestamp: str, public_catalog_id: int = None,
+                       spatial_extent_intersects: str or dict = None,
+                       spatial_extent_bbox: list[float] = None):
     if spatial_extent_bbox:
         geom = box(*spatial_extent_bbox)
     elif spatial_extent_intersects:
@@ -176,62 +172,38 @@ def search_collections(time_interval_timestamp: str, public_catalog_id: int = No
             spatial_extent_intersects = json.loads(spatial_extent_intersects)
         geom = shape(spatial_extent_intersects['geometry'])
 
-    a = db.session.query(PublicCollection).filter(PublicCollection.spatial_extent.ST_Intersects(
-        f"SRID=4326;{geom.wkt}"))
-
-    if public_catalog_id:
-        a = a.filter(PublicCollection.parent_catalog == public_catalog_id)
     time_start, time_end = process_timestamp.process_timestamp_dual_string(time_interval_timestamp)
-    # all 4 cases of time_start and time_end
-    if time_start and time_end:
-        a = a.filter(
-            or_(PublicCollection.temporal_extent_start <= time_end, PublicCollection.temporal_extent_start == None),
-            or_(PublicCollection.temporal_extent_end >= time_start, PublicCollection.temporal_extent_end == None))
-    elif time_start and not time_end:
-        a = a.filter(
-            or_(PublicCollection.temporal_extent_end >= time_start, PublicCollection.temporal_extent_end == None))
-    elif not time_start and time_end:
-        a = a.filter(
-            or_(PublicCollection.temporal_extent_start <= time_end, PublicCollection.temporal_extent_start == None))
+
+    public_catalog_objects_to_search = []
+    if public_catalog_id:
+        public_catalog_objects_to_search.append(PublicCatalog.query.filter_by(id=public_catalog_id).first())
     else:
-        pass
-    data = a.all()
-    grouped_data = {}
-    for item in data:
-        item: PublicCollection
-        if item.parent_catalog in grouped_data:
-            grouped_data[item.parent_catalog]["collections"].append(item.as_dict())
-        else:
-            grouped_data[item.parent_catalog] = {}
-            grouped_data[item.parent_catalog]["catalog"] = PublicCatalog.query.filter_by(
-                id=item.parent_catalog).first().as_dict()
-            grouped_data[item.parent_catalog]["collections"] = []
-            grouped_data[item.parent_catalog]["collections"].append(item.as_dict())
-    if not public_catalog_id:
-        keys = list(grouped_data.keys())
-        out = []
-        for i in keys:
-            out.append(grouped_data[i])
-        return out
-    else:
-        try:
-            return grouped_data[public_catalog_id]
-        except KeyError:
-            return []
+        public_catalog_objects_to_search = PublicCatalog.query.all()
+
+    pool = Pool()  # You can specify the number of processes to use here. Default is CPU count.
+    data = []
+    for public_catalog in public_catalog_objects_to_search:
+        result = pool.apply_async(get_collections_for_public_catalog, args=(public_catalog, geom, time_start, time_end))
+        out = result.get()
+        if out:
+            data.extend(out)
+    pool.close()
+    pool.join()
+    logging.info(f"Found {len(data)} collections")
+    # order data by public_catalog key value
+    data = sorted(data, key=lambda k: k['parent_catalog'])
+    return data
 
 
+@cached(TTLCache(maxsize=1000, ttl=3600))
 def get_collections_from_public_catalog_id(public_catalog_id: int):
-    try:
-        get_public_catalog_by_id_as_dict(public_catalog_id)
-    except CatalogDoesNotExistError:
-        raise PublicCatalogDoesNotExistError
-    data = PublicCollection.query.filter_by(parent_catalog=public_catalog_id).all()
-    out = []
-    for item in data:
-        out.append(item.as_dict())
-    return out
+    catalog = PublicCatalog.query.filter_by(id=public_catalog_id).first()
+    catalog_url = catalog.url
+    collections_url = urljoin(catalog_url, 'collections')
+    return get_collection(collections_url)
 
 
+@cached(TTLCache(maxsize=1000, ttl=3600))
 def get_collection(collections_url: str):
     logging.info(f"Getting collections from {collections_url}")
     headers = {
@@ -262,7 +234,7 @@ def get_collection(collections_url: str):
 
 
 @cached(TTLCache(maxsize=1000, ttl=3600))
-def get_all_stored_public_collections_as_list_of_dict():
+def get_all_available_public_collections():
     all_public_catalogs = PublicCatalog.query.all()
     out = []
     pool = Pool()  # You can specify the number of processes to use here. Default is CPU count.
@@ -286,71 +258,6 @@ def get_all_stored_public_collections_as_list_of_dict():
     pool.join()
 
     return out
-
-# def get_all_stored_public_collections_as_list_of_dict():
-#     all_public_catalogs = PublicCatalog.query.all()
-#     out = []
-#     for public_catalog in all_public_catalogs:
-#         public_catalog_url = public_catalog.url
-#         logging.info(f"Catalog url: {public_catalog_url}")
-#         # if catalog_url does not end with a slash, add it
-#         if not public_catalog_url.endswith('/'):
-#             public_catalog_url = public_catalog_url + '/'
-#         collections_url = urllib.parse.urljoin(public_catalog_url, 'collections')
-#         collections = get_collection(collections_url)
-#         for i in collections:
-#             i["parent_catalog"] = public_catalog.id
-#
-#             out.append(i)
-#     return out
-
-def _get_all_available_collections_from_public_catalog(public_catalogue_entry: PublicCatalog) -> List[Dict[
-    any, any]]:
-    """
-    Get all available collections from a public catalog.
-
-    :param public_catalogue_entry: PublicCatalog object
-    :return: List of all collections in the catalog
-    """
-    logging.info("Getting collections from catalog: " + public_catalogue_entry.name)
-    url = public_catalogue_entry.url
-    # if url ends with /, remove it
-    if url.endswith('/'):
-        url = url[:-1]
-    collections_url = url + '/collections'
-    response = requests.get(collections_url)
-    response_result = response.json()
-    # for each collection, check if it is empty
-    collections = response_result['collections']
-    collections_to_return = []
-    for collection in collections:
-        try:
-            # get the item link
-            links = collection['links']
-            # find link with rel type 'item'
-            item_link = None
-            for link in links:
-                if link['rel'] == 'items':
-                    item_link = link['href']
-                    break
-            # if item link is not found, skip this collection
-            if item_link is None:
-                logging.info("Skipping collection without item link: " + collection['title'])
-                continue
-            # if item link is found, check if it is empty
-            item_link_response = requests.get(item_link)
-            if item_link_response.status_code != 200:
-                logging.info("Skipping collection with not-public item link: " + collection['title'])
-                continue
-            item_link_response_json = item_link_response.json()
-            if len(item_link_response_json['features']) == 0:
-                logging.info("Skipping empty collection: " + collection['title'])
-                continue
-            collections_to_return.append(collection)
-        except Exception as e:
-            logging.error("Skipping collection with error: " + collection['title'])
-            logging.error(e)
-    return collections_to_return
 
 
 def get_all_stored_public_catalogs() -> List[Dict[any, any]]:
@@ -622,18 +529,13 @@ def _run_ingestion_task_force_update(
     return responses_from_ingestion_microservice
 
 
-def remove_collection_from_public_catalog(catalog_id: int, collection_id: str):
+def remove_collection_from_public_catalog(collection_id: str):
     """
     Remove a collection from the public catalog.
 
     :param catalog_id: Catalog id of the public catalog
     :param collection_id: Collection id to remove from the public catalog
     """
-    public_catalog = PublicCollection.query.filter_by(parent_catalog=catalog_id, id=collection_id).first()
-    if public_catalog is None:
-        raise PublicCollectionDoesNotExistError
-    db.session.delete(public_catalog)
-    db.session.commit()
     try:
         return stac_service.remove_public_collection_by_id_on_stac_api(collection_id)
     except CollectionDoesNotExistError:

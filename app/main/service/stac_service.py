@@ -13,7 +13,7 @@ def get_all_collections() -> Dict[str, any]:
     response = requests.get(urljoin(current_app.config["READ_STAC_API_SERVER"], "collections/"))
     if response.status_code in range(200, 203):
         collection_json = response.json()
-        public_collections: [] = public_catalogs_service.get_public_collections()
+        public_collections: [] = public_catalogs_service.get_all_available_public_collections()
         public_collections_ids = [collection["id"] for collection in public_collections]
         for collection in collection_json["collections"]:
             collection["management_metadata"] = {}
