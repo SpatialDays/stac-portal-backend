@@ -18,9 +18,6 @@ from sqlalchemy import or_
 from cachetools import cached, TTLCache
 
 cache = TTLCache(maxsize=1000, ttl=3600)
-from diskcache import Cache
-
-disk_cache = Cache('./cache')
 
 logging.basicConfig(level=logging.INFO)
 
@@ -235,9 +232,6 @@ def get_collections_from_public_catalog_id(public_catalog_id: int):
     return out
 
 
-# @lru_cache(maxsize=None)  # Python 3.9 or later users can use @cache
-# @cached(cache)
-@disk_cache.memoize()
 def get_collection(collections_url: str):
     logging.info(f"Getting collections from {collections_url}")
     headers = {
@@ -267,7 +261,7 @@ def get_collection(collections_url: str):
     return to_return
 
 
-
+@cached(TTLCache(maxsize=1000, ttl=3600))
 def get_all_stored_public_collections_as_list_of_dict():
     all_public_catalogs = PublicCatalog.query.all()
     out = []
