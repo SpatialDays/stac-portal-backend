@@ -112,7 +112,7 @@ class PublicCatalogsCollections(Resource):
     @api.response(200, "Success")
     @api.expect(PublicCatalogsDto.collection_search, validate=True)
     @auth_decorator.header_decorator(
-        allowed_roles=["StacPortal.Creator"]  # TODO: Wrong role
+        allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
     )
     def post(self):
         spatial_extent_bbox: List[float] = request.json.get("bbox", None)
@@ -169,7 +169,7 @@ class SpecificPublicCatalogCollections(Resource):
     @api.response(404, "Not Found - Catalog does not exist")
     @api.expect(PublicCatalogsDto.collection_search, validate=True)
     @auth_decorator.header_decorator(
-        allowed_roles=["StacPortal.Creator"]  # TODO: Wrong role
+        allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
     )
     def post(self, public_catalog_id):
         spatial_extent_bbox: List[float] = request.json.get("bbox", None)
@@ -194,7 +194,7 @@ class PublicCatalogLoadHistory(Resource):
     @api.response(200, "Success")
     @api.response(404, "Not Found - Catalog does not exist")
     @auth_decorator.header_decorator(
-        allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
+        allowed_roles=["StacPortal.Viewer"]
     )
     def get(self, public_catalog_id):
         try:
@@ -216,7 +216,7 @@ class GetStacRecordsSpecifyingPublicCatalogId(Resource):
     @api.expect(PublicCatalogsDto.start_stac_ingestion, validate=True)
     @api.response(200, "Success")
     @auth_decorator.header_decorator(
-        allowed_roles=["StacPortal.Creator"]
+        allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
     )
     def post(self, public_catalog_id):
         data = request.json
@@ -285,7 +285,7 @@ class UpdateStacRecordsSpecifyingPublicCatalogId(Resource):
 class UpdateAllStacRecords(Resource):
     @api.doc(description="Update all stored stac records from all public catalogs")
     @auth_decorator.header_decorator(
-        allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
+        allowed_roles=["StacPortal.Creator"]
     )
     def get(self):
         result = public_catalogs_service.update_all_stac_records()
@@ -316,7 +316,7 @@ class UpdateCollectionsViaSearchParameter(Resource):
     @api.doc(description="Update collections via stored search parameter id")
     @api.response(200, "Success")
     @auth_decorator.header_decorator(
-        allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
+        allowed_roles=["StacPortal.Creator"]
     )
     def get(self, parameter_id):
         try:
