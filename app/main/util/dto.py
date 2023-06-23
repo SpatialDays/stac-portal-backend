@@ -100,7 +100,6 @@ class PrivateCatalogDto:
     )
 
 
-
 class ValidateDto:
     api = Namespace("validate", description="validate related operations")
     validate = api.model(
@@ -266,22 +265,6 @@ class StatusReportingDto:
 
 class FileDto:
     api = Namespace("files", description="File upload related operations")
-    file_upload = api.parser()
-    file_upload.add_argument("file", location="files", type=FileStorage, required=True)
-
-
-class GdalInfoDto:
-    api = Namespace("gdal_info", description="gdalinfo related operations")
-    get_gdal_info = api.model(
-        "gdalinfo",
-        {
-            "file_url": fields.String(
-                required=True,
-                description="url of the file to get the stac info for",
-                example="https://ctpltstacstrgdev.blob.core.windows.net/stac-items/LC09_L2SP_202024_20220810_20220812_02_T1_SR_B4.tiff",
-            ),
-        },
-    )
 
 
 class StacDto:
