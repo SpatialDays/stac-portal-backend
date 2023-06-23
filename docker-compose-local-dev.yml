@@ -50,6 +50,7 @@ services:
     command: postgres -N 500
 
   stac-fastapi:
+    container_name: stac-portal-backend-stac-fastapi
     image: oseoinfraacrstaging.azurecr.io/stac-fastapi:6b24dbc
     platform: linux/amd64
     environment:
@@ -78,7 +79,7 @@ services:
     depends_on:
       - stac-database
     command: >
-     bash -c "sleep 10 && python -m stac_fastapi.pgstac.app"
+     bash -c "sleep 15 && python -m stac_fastapi.pgstac.app"
   
   redis-server:
     image: redis:6.2.5

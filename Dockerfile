@@ -1,6 +1,6 @@
 # This Dockerfile builds the API only.
 
-FROM python:3.9.5
+FROM python:3.10
 WORKDIR /app
 RUN python --version
 RUN pip3 --version

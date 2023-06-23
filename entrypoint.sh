@@ -20,7 +20,7 @@ echo "CREATE EXTENSION IF NOT EXISTS postgis;" > /tmp/install_postgis_extension.
 PGPASSWORD="$POSTGRES_PASS" psql -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DBNAME" -f /tmp/install_postgis_extension.sql
 echo "PostGIS extension installation complete."
 
-cat << EOF > setup.py
+cat << EOF > setup-database.py
 import os
 
 from flask_cli import FlaskGroup
@@ -43,7 +43,8 @@ db.create_all()
 print("Database tables created")
 EOF
 
-FLASK_APP=manage.py python3 setup.py
+FLASK_APP=manage.py python3 setup-database.py
+rm setup-database.py
 
 # FLASK_APP=manage.py python3 manage.py db migrate
 # FLASK_APP=manage.py python3 manage.py db upgrade
