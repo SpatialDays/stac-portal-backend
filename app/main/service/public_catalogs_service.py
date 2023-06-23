@@ -2,40 +2,37 @@ import functools
 import json
 import logging
 import urllib
-from threading import Thread
-from typing import Dict, List
-from urllib.parse import urljoin
-
-from stac_collection_search import search_collections_verbose as search_collections_on_stac_api
-from multiprocessing import Pool
 import redis
 import requests
 import shapely
 import sqlalchemy
+from multiprocessing import Pool
+from threading import Thread
+from typing import Dict, List
+from urllib.parse import urljoin
+from cachetools import cached, TTLCache
 from flask import current_app
 from shapely.geometry import box, shape
-from cachetools import cached, TTLCache
 
-logging.basicConfig(level=logging.INFO)
+from stac_collection_search import search_collections_verbose as search_collections_on_stac_api
 
-from app.main.model.public_catalogs_model import PublicCatalog
 from .status_reporting_service import make_stac_ingestion_status_entry
+from ..model.public_catalogs_model import PublicCatalog
 from .. import db
 from ..custom_exceptions import *
 from ..model.public_catalogs_model import StoredSearchParameters
-from ..service import stac_service
 from ..util import process_timestamp
 
+logging.basicConfig(level=logging.DEBUG)
 
-def store_new_public_catalog(name: str, url: str, description: str, return_as_dict=True) -> Dict[
-                                                                                                any, any] or PublicCatalog:
+
+def store_new_public_catalog(name: str, url: str, description: str) -> PublicCatalog:
     """
     Store a new public catalog in the database.
 
     :param name: Name of the catalog
     :param url: Url of the catalog
     :param description: Description of the catalog
-    :param return_as_dict: (True) Return the catalog as a dict, (False) return the catalog as a PublicCatalog object
     :return: The catalog as a dict or PublicCatalog object
     """
     try:
@@ -45,10 +42,7 @@ def store_new_public_catalog(name: str, url: str, description: str, return_as_di
         a.description = description
         db.session.add(a)
         db.session.commit()
-        if return_as_dict:
-            return a.as_dict()
-        else:
-            return a
+        return a
     except sqlalchemy.exc.IntegrityError:
         # rollback the session
         db.session.rollback()
@@ -58,8 +52,6 @@ def store_new_public_catalog(name: str, url: str, description: str, return_as_di
 def store_publicly_available_catalogs() -> None:
     """
     Get all publicly available catalogs and store them in the database.
-
-    :return: The number of catalogs stored
     """
     lookup_api: str = "https://stacindex.org/api/catalogs"
     logging.info(f"Looking up stac index on {lookup_api}")
@@ -71,10 +63,16 @@ def store_publicly_available_catalogs() -> None:
     def run_async(title, catalog_url, catalog_summary, app_for_context):
         with app_for_context.app_context():
             try:
-                _store_catalog(title, catalog_url, catalog_summary)
+                if not _is_catalog_public_and_valid(catalog_url):
+                    raise PublicCatalogNotPublicOrValidError
+                try:
+                    new_catalog: PublicCatalog = store_new_public_catalog(title, catalog_url, catalog_summary)
+                    logging.info(f"Storing catalog {title} with id {new_catalog.id}")
+                except CatalogAlreadyExistsError:
+                    logging.info(f"Catalog {title} already exists.")
+                    raise CatalogAlreadyExistsError
             except:
-                pass
-                # logging.error(f"Error storing catalog {title}.")
+                logging.error(f"Error storing catalog {title}.")
 
     app = current_app._get_current_object()  # TODO: Is there a better way to do this?
     for catalog in filtered_response_result:
@@ -90,7 +88,6 @@ def remove_all_public_catalogs() -> None:
     db.session.commit()
 
 
-@cached(TTLCache(maxsize=1000, ttl=3600))
 def _is_catalog_public_and_valid(url: str) -> bool:
     """
     Check if a catalog is public and valid.
@@ -113,28 +110,9 @@ def _is_catalog_public_and_valid(url: str) -> bool:
     return True
 
 
-def _store_catalog(title, url, summary) -> None:
-    """
-    Store a catalog and all its collections in the database.
-
-    :param title: Title of the catalog
-    :param url: Url of the catalog
-    :param summary: Summary of the catalog
-    :return: Number of collections stored, None if the catalog is not public or valid
-    """
-    if not _is_catalog_public_and_valid(url):
-        raise PublicCatalogNotPublicOrValidError
-    try:
-        new_catalog: PublicCatalog = store_new_public_catalog(title, url, summary, return_as_dict=False)
-        logging.info(f"Storing catalog {title} with id {new_catalog.id}")
-    except CatalogAlreadyExistsError:
-        logging.info(f"Catalog {title} already exists.")
-        raise CatalogAlreadyExistsError
-
-
-@cached(TTLCache(maxsize=1000, ttl=3600))
+@cached(TTLCache(maxsize=1000, ttl=3600)) # does not cache when the threading is used
 def get_collections_for_public_catalog(public_catalog, spatial_extent, time_start, time_end):
-    collections_url = urljoin(public_catalog.url, 'collections')
+    collections_url = urljoin(public_catalog.url + "/", 'collections')
     logging.info(f"Searching collections on {collections_url}")
     headers = {
         "Content-Type": "application/geo+json"
@@ -150,7 +128,6 @@ def get_collections_for_public_catalog(public_catalog, spatial_extent, time_star
         return None
 
     response_as_json_dict = response.json()
-    logging.info(f"Found {len(response_as_json_dict['collections'])} collections on {collections_url}")
     results = search_collections_on_stac_api(response_as_json_dict, spatial_extent=spatial_extent,
                                              temporal_extent_start=time_start, temporal_extent_end=time_end)
 
@@ -161,7 +138,7 @@ def get_collections_for_public_catalog(public_catalog, spatial_extent, time_star
     return data
 
 
-# @cached(TTLCache(maxsize=1000, ttl=3600))
+# @cached(TTLCache(maxsize=1000, ttl=3600)) # TODO: Find a way to hash this output, this cant do it. Filehash probably can
 def search_collections(time_interval_timestamp: str, public_catalog_id: int = None,
                        spatial_extent_intersects: str or dict = None,
                        spatial_extent_bbox: list[float] = None):
@@ -199,7 +176,7 @@ def search_collections(time_interval_timestamp: str, public_catalog_id: int = No
 def get_collections_from_public_catalog_id(public_catalog_id: int):
     catalog = PublicCatalog.query.filter_by(id=public_catalog_id).first()
     catalog_url = catalog.url
-    collections_url = urljoin(catalog_url, 'collections')
+    collections_url = urljoin(catalog_url + "/", 'collections')
     return get_collection(collections_url)
 
 
@@ -265,16 +242,18 @@ def get_all_stored_public_catalogs() -> List[Dict[any, any]]:
     Get all stored public catalogs as a list of dictionaries.
     :return: Public catalogs as a list of dictionaries
     """
-    a: [PublicCatalog] = PublicCatalog.query.all()
+    all_public_catalogs: [PublicCatalog] = PublicCatalog.query.all()
     data = []
-    for item in a:
-        x = item.as_dict()
-        x["stored_search_parameters"] = get_all_stored_search_parameters(item.id)
+    for public_catalog in all_public_catalogs:
+        x = {"id": public_catalog.id, "name": public_catalog.name, "url": public_catalog.url,
+             "description": public_catalog.description,
+             "added_on": public_catalog.added_on.strftime("%m/%d/%Y, %H:%M:%S"),
+             "stored_search_parameters": get_stored_search_parameters_by_catalog_id(public_catalog.id)}
         data.append(x)
     return data
 
 
-def get_public_catalog_by_id_as_dict(public_catalog_id: int) -> Dict[any, any]:
+def get_public_catalog_by_id(public_catalog_id: int) -> PublicCatalog:
     """
     Get a public catalog by its id as a dictionary.
     :param public_catalog_id: Id of the public catalog
@@ -283,12 +262,12 @@ def get_public_catalog_by_id_as_dict(public_catalog_id: int) -> Dict[any, any]:
     try:
         a: PublicCatalog = PublicCatalog.query.filter_by(
             id=public_catalog_id).first()
-        return a.as_dict()
+        return a
     except AttributeError:
         raise CatalogDoesNotExistError
 
 
-def remove_public_catalog_via_catalog_id(public_catalog_id: int) -> Dict[any, any]:
+def remove_public_catalog_via_catalog_id(public_catalog_id: int) -> PublicCatalog:
     """
     Remove a public catalog by its id.
     :param public_catalog_id: Id of the public catalog to remove
@@ -299,7 +278,7 @@ def remove_public_catalog_via_catalog_id(public_catalog_id: int) -> Dict[any, an
             id=public_catalog_id).first()
         db.session.delete(a)
         db.session.commit()
-        return a.as_dict()
+        return a
     except sqlalchemy.orm.exc.UnmappedInstanceError:
         raise CatalogDoesNotExistError
 
@@ -529,38 +508,25 @@ def _run_ingestion_task_force_update(
     return responses_from_ingestion_microservice
 
 
-def remove_collection_from_public_catalog(collection_id: str):
+def get_stored_search_parameters_by_catalog_id(catalog_id: int) -> List[Dict[any, any]]:
     """
-    Remove a collection from the public catalog.
+    Get stored search parameters by catalog id.
 
-    :param catalog_id: Catalog id of the public catalog
-    :param collection_id: Collection id to remove from the public catalog
-    """
-    try:
-        return stac_service.remove_public_collection_by_id_on_stac_api(collection_id)
-    except CollectionDoesNotExistError:
-        pass
-    return "Collection does not exist on STAC API"
-
-
-def get_all_stored_search_parameters(public_catalog_id: int = None) -> [Dict[any, any]]:
-    """
-    Get all stored search parameters.
-
-    :param public_catalog_id: Public catalog id to get stored search parameters for
+    :param catalog_id: Catalog id to get stored search parameters for
     :return: List of stored search parameters
     """
-    public_catalog = PublicCatalog.query.filter_by(id=public_catalog_id).first()
-    if public_catalog is None:
-        raise PublicCatalogDoesNotExistError
-    if public_catalog_id is None:
-        data = StoredSearchParameters.query.all()
-        return_data = []
-        for i in data:
-            return_data.append(i.to_dict())
-    else:
-        data = StoredSearchParameters.query.filter_by(associated_catalog_id=public_catalog_id).all()
-        return [i.as_dict() for i in data]
+    to_return = []
+    data = StoredSearchParameters.query.filter_by(associated_catalog_id=catalog_id).all()
+    for i in data:
+        to_return.append({
+            "id": i.id,
+            "collection": i.collection,
+            "bbox": json.loads(i.bbox),
+            "datetime": json.loads(i.datetime),
+            "used_search_parameters": json.loads(i.used_search_parameters),
+            "associated_catalog_id": i.associated_catalog_id
+        })
+    return to_return
 
 
 def run_search_parameters(parameter_id: int) -> int:

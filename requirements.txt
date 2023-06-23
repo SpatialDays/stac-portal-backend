@@ -73,5 +73,5 @@ cryptography==41.0.0
 PyJWT==2.7.0
 requests==2.31.0
 urllib3==2.0.3
-stac-collection-search==0.0.5
+stac-collection-search==0.0.6
 cachetools==5.3.1

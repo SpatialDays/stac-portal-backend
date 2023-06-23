@@ -1,9 +1,11 @@
 version: '3'
 services:
-  app-sqlalchemy:
+  stac-portal-backend:
     container_name: stac-portal-backend
-    image: oseoinfraacrstaging.azurecr.io/stac-portal-backend:6363dd7
+    build:
+      context: .
+      dockerfile: Dockerfile
     platform: linux/amd64
-    network_mode: host
     env_file:
       - .env
+    network_mode: host

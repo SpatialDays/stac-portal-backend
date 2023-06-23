@@ -38,12 +38,15 @@ class PublicCatalogs(Resource):
             name = data["name"]
             url = data["url"]
             description = data["description"]
-            return (
-                public_catalogs_service.store_new_public_catalog(
-                    name, url, description
-                ),
-                201,
-            )
+            new_public_catalog = public_catalogs_service.store_new_public_catalog(name, url, description)
+            return ({
+                        "name": new_public_catalog.name,
+                        "id": new_public_catalog.id,
+                        "url": new_public_catalog.url,
+                        "description": new_public_catalog.description,
+                        "added_on": new_public_catalog.added_on.strftime("%m/%d/%Y, %H:%M:%S")
+                    }, 201)
+
         except IndexError:
             return {
                        "message": "Some elements in json body are not present",
@@ -73,9 +76,15 @@ class GetPublicCatalogViaCatalogId(Resource):
     )
     def get(self, public_catalog_id):
         try:
-            return public_catalogs_service.get_public_catalog_by_id_as_dict(
-                public_catalog_id
-            )
+            public_catalog = public_catalogs_service.get_public_catalog_by_id(public_catalog_id)
+
+            return {
+                "id": public_catalog.id,
+                "name": public_catalog.name,
+                "url": public_catalog.url,
+                "description": public_catalog.description,
+                "added_on": public_catalog.added_on.strftime("%m/%d/%Y, %H:%M:%S")
+            }
 
         except CatalogDoesNotExistError:
             return {"message": "Public catalog not found"}, 404
@@ -88,9 +97,14 @@ class GetPublicCatalogViaCatalogId(Resource):
     )
     def delete(self, public_catalog_id):
         try:
-            return public_catalogs_service.remove_public_catalog_via_catalog_id(
-                public_catalog_id
-            )
+            public_catalog = public_catalogs_service.remove_public_catalog_via_catalog_id(public_catalog_id)
+            return {
+                "id": public_catalog.id,
+                "name": public_catalog.name,
+                "url": public_catalog.url,
+                "description": public_catalog.description,
+                "added_on": public_catalog.added_on.strftime("%m/%d/%Y, %H:%M:%S")
+            }
         except CatalogDoesNotExistError:
             return {"message": "No result found"}, 404
 
@@ -199,7 +213,7 @@ class PublicCatalogLoadHistory(Resource):
     def get(self, public_catalog_id):
         try:
             return (
-                public_catalogs_service.get_all_stored_search_parameters(
+                public_catalogs_service.get_stored_search_parameters_by_catalog_id(
                     public_catalog_id
                 ),
                 200,
