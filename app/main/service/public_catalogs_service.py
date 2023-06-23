@@ -298,10 +298,8 @@ def load_specific_collections_via_catalog_id(catalog_id: int,
     if parameters is None:
         parameters = {}
     parameters['source_stac_catalog_url'] = public_catalogue_entry.url
-    target_stac_api_url = current_app.config['WRITE_STAC_API_SERVER']
     _store_search_parameters(catalog_id, parameters)
-    parameters["target_stac_catalog_url"] = target_stac_api_url
-    return _call_ingestion_microservice(parameters)
+    return _call_ingestion_microservice(parameters, public_catalogue_entry.url, update=True)
 
 
 def update_all_stac_records() -> None:
@@ -367,39 +365,8 @@ def update_specific_collections_via_catalog_id(catalog_id: int,
         stored_search_parameters_to_run)
 
 
-def _call_ingestion_microservice(parameters) -> int:
-    """
-    Call the ingestion microservice to load collections into the database.
-
-    Also saves the search parameters used to load the collections into the database so
-    the update can be called using the same parameters.
-
-    :param parameters: STAC Filter parameters
-    :return: Work session id which can be used to check the status of the ingestion
-    """
-
-    """
-    example payload:
-    
-    {
-      "source_stac_catalog_url": "https://earth-search.aws.element84.com/v0/",
-      "target_stac_catalog_url": "http://localhost:8080",
-      "update": true,
-      "callback_id": "1234",
-      "stac_search_parameters": {
-        "bbox": [-1, 50, 1, 51],
-        "datetime": "2022-04-04T00:00:00Z/2022-05-05T00:00:00Z",
-        "collections": ["sentinel-s2-l2a"]
-      }
-    }
-
-    """
-    # TODO: parameters should really be passed separately, not as a dictionary containing everything
-    # TODO: now because of that we need to pop elements that are not STAC search parameters
-    source_stac_catalog_url = parameters.pop('source_stac_catalog_url')
+def _call_ingestion_microservice(parameters, source_stac_catalog_url: str, update=False) -> int:
     target_stac_catalog_url = current_app.config['WRITE_STAC_API_SERVER']
-    parameters.pop('target_stac_catalog_url')
-    update = parameters.pop('update')
     callback_id = make_stac_ingestion_status_entry(source_stac_catalog_url, target_stac_catalog_url, update)
     payload = {
         "source_stac_catalog_url": source_stac_catalog_url,
@@ -448,6 +415,7 @@ def _store_search_parameters(associated_catalogue_id,
 
                 db.session.add(stored_search_parameters)
                 db.session.commit()
+                logging.info(f"Stored search parameters for collection {collection}")
             except sqlalchemy.exc.IntegrityError:
                 # exact same search parameters already exist, no need to store them again
                 pass
@@ -508,12 +476,12 @@ def _run_ingestion_task_force_update(
     """
     responses_from_ingestion_microservice = []
     for i in stored_search_parameters:
+        i: StoredSearchParameters
         try:
             used_search_parameters = json.loads(i.used_search_parameters)
-            used_search_parameters["target_stac_catalog_url"] = current_app.config["READ_STAC_API_SERVER"]
-            used_search_parameters["update"] = True
+            catalog_url = PublicCatalog.query.filter_by(id=i.associated_catalog_id).first().url
             microservice_response = _call_ingestion_microservice(
-                used_search_parameters)
+                used_search_parameters, source_stac_catalog_url= catalog_url, update=True)
             responses_from_ingestion_microservice.append(
                 microservice_response)
         except ValueError:
@@ -549,14 +517,12 @@ def run_search_parameters(parameter_id: int) -> int:
     :param parameter_id: Id of the search parameter to run
     :return: Work session id
     """
-    stored_search_parameters = StoredSearchParameters.query.filter_by(id=parameter_id).first()
+    stored_search_parameters: StoredSearchParameters = StoredSearchParameters.query.filter_by(id=parameter_id).first()
     if stored_search_parameters is None:
         raise StoredSearchParametersDoesNotExistError
     try:
         used_search_parameters = json.loads(stored_search_parameters.used_search_parameters)
-        used_search_parameters["target_stac_catalog_url"] = current_app.config["READ_STAC_API_SERVER"]
-        used_search_parameters["update"] = True
-        microservice_response = _call_ingestion_microservice(used_search_parameters)
+        microservice_response = _call_ingestion_microservice(used_search_parameters, PublicCatalog.query.filter_by(id=stored_search_parameters.associated_catalog_id).first().url ,update=True)
         return microservice_response
     except ValueError:
         pass

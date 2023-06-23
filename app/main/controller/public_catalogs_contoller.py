@@ -320,7 +320,8 @@ class UpdateCollectionsViaSearchParameter(Resource):
     )
     def get(self, parameter_id):
         try:
-            return public_catalogs_service.run_search_parameters(parameter_id), 200
+            public_catalogs_service.run_search_parameters(parameter_id)
+            return {"message": "Update started"}, 200
         except StoredSearchParametersDoesNotExistError:
             return {
                        "message": "Search param with this id does not exist",
