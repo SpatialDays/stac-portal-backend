@@ -298,7 +298,6 @@ class UpdateAllStacRecords(Resource):
         return {"message": "Update started"}, 200
 
 
-
 @api.route("/sync/")
 class PublicCatalogsUpdate(Resource):
     @api.doc(description="Get all public catalogs and update them")

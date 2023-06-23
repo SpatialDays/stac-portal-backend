@@ -520,9 +520,8 @@ def run_search_parameters(parameter_id: int) -> int:
     stored_search_parameters: StoredSearchParameters = StoredSearchParameters.query.filter_by(id=parameter_id).first()
     if stored_search_parameters is None:
         raise StoredSearchParametersDoesNotExistError
-    try:
-        used_search_parameters = json.loads(stored_search_parameters.used_search_parameters)
-        microservice_response = _call_ingestion_microservice(used_search_parameters, PublicCatalog.query.filter_by(id=stored_search_parameters.associated_catalog_id).first().url ,update=True)
-        return microservice_response
-    except ValueError:
-        pass
+    used_search_parameters = json.loads(stored_search_parameters.used_search_parameters)
+    microservice_response = _call_ingestion_microservice(used_search_parameters, PublicCatalog.query.filter_by(id=stored_search_parameters.associated_catalog_id).first().url ,update=True)
+    return microservice_response
+
+

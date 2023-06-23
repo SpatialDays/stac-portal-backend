@@ -13,18 +13,6 @@ def get_all_collections() -> Dict[str, any]:
     response = requests.get(urljoin(current_app.config["READ_STAC_API_SERVER"], "collections/"))
     if response.status_code in range(200, 203):
         collection_json = response.json()
-        # TODO : Replace this with a better solution
-        
-        # public_collections: List = public_catalogs_service.get_all_available_public_collections()
-        # public_collections_ids = [collection["id"] for collection in public_collections]
-        # # for collection in collection_json["collections"]:
-        # #     collection["management_metadata"] = {}
-        # #     if collection["id"] in public_collections_ids:
-        # #         index = public_collections_ids.index(collection["id"])
-        # #         collection["management_metadata"]["parent_catalog_id"] = public_collections[index]["parent_catalog"]
-        # #         collection["management_metadata"]["is_public"] = True
-        # #     else:
-        # #         collection["management_metadata"]["is_public"] = False
         return collection_json
     else:
         resp = response.json()
