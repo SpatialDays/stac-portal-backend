@@ -110,7 +110,7 @@ def _is_catalog_public_and_valid(url: str) -> bool:
     return True
 
 
-@cached(TTLCache(maxsize=1000, ttl=3600)) # does not cache when the threading is used
+@cached(TTLCache(maxsize=1000, ttl=3600))  # does not cache when the threading is used
 def get_collections_for_public_catalog(public_catalog, spatial_extent, time_start, time_end):
     collections_url = urljoin(public_catalog.url + "/", 'collections')
     logging.info(f"Searching collections on {collections_url}")
@@ -304,19 +304,39 @@ def load_specific_collections_via_catalog_id(catalog_id: int,
     return _call_ingestion_microservice(parameters)
 
 
-def update_all_stac_records() -> List[int]:
+def update_all_stac_records() -> None:
     """
     Update all STAC records in the database.
     :return: Updated collection ids
     """
     stored_search_parameters: [StoredSearchParameters
                                ] = StoredSearchParameters.query.all()
-    return _run_ingestion_task_force_update(stored_search_parameters)
+    _run_ingestion_task_force_update(stored_search_parameters)
+
+
+def update_all_collections_via_catalog_id(catalog_id: int) -> None:
+    """
+    Update all collections from a catalog
+    :param catalog_id: Catalog id of the catalog to update collections from
+    :return: Updated collection ids
+    """
+    public_catalogue_entry: PublicCatalog = PublicCatalog.query.filter_by(
+        id=catalog_id).first()
+
+    if public_catalogue_entry is None:
+        raise CatalogDoesNotExistError("No catalogue entry found for id: " +
+                                       str(catalog_id))
+    stored_search_parameters: [StoredSearchParameters
+                               ] = StoredSearchParameters.query.filter_by(
+        associated_catalog_id=catalog_id).all()
+    stored_search_parameters_to_run = stored_search_parameters
+    _run_ingestion_task_force_update(
+        stored_search_parameters_to_run)
 
 
 def update_specific_collections_via_catalog_id(catalog_id: int,
-                                               collections: [str] = None
-                                               ) -> List[int]:
+                                               collections: [str]
+                                               ) -> None:
     """
     Update specific collections from a catalog into the database.
     :param catalog_id: Catalog id of the catalog to update collections from
@@ -333,25 +353,18 @@ def update_specific_collections_via_catalog_id(catalog_id: int,
                                ] = StoredSearchParameters.query.filter_by(
         associated_catalog_id=catalog_id).all()
     stored_search_parameters_to_run = []
-    if collections is None or len(collections) == 0:
-        stored_search_parameters_to_run = stored_search_parameters
-        return _run_ingestion_task_force_update(
-            stored_search_parameters_to_run)
-    else:
-        for stored_search_parameter in stored_search_parameters:
-            used_search_parameters = json.loads(
-                stored_search_parameter.used_search_parameters)
-            used_search_parameters_collections = used_search_parameters[
-                'collections']
-            # if any collection in used_search_parameters_collections is in collections, then add to
-            # stored_search_parameters_to_run
-            check = any(item in used_search_parameters_collections
-                        for item in collections)
-            if check:
-                stored_search_parameters_to_run.append(stored_search_parameter)
+    for stored_search_parameter in stored_search_parameters:
+        used_search_parameters = json.loads(
+            stored_search_parameter.used_search_parameters)
+        used_search_parameters_collections = used_search_parameters[
+            'collections']
+        check = any(item in used_search_parameters_collections
+                    for item in collections)
+        if check:
+            stored_search_parameters_to_run.append(stored_search_parameter)
 
-        return _run_ingestion_task_force_update(
-            stored_search_parameters_to_run)
+    _run_ingestion_task_force_update(
+        stored_search_parameters_to_run)
 
 
 def _call_ingestion_microservice(parameters) -> int:

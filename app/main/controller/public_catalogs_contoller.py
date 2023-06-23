@@ -202,7 +202,7 @@ class SpecificPublicCatalogCollections(Resource):
                    }, 404
 
 
-@api.route("/<int:public_catalog_id>/load_history/")
+@api.route("/<int:public_catalog_id>/load/history/")
 class PublicCatalogLoadHistory(Resource):
     @api.doc(description="Get load history for specified public catalog")
     @api.response(200, "Success")
@@ -224,7 +224,7 @@ class PublicCatalogLoadHistory(Resource):
                    }, 404
 
 
-@api.route("/<int:public_catalog_id>/items/get/")
+@api.route("/<int:public_catalog_id>/load/")
 class GetStacRecordsSpecifyingPublicCatalogId(Resource):
     @api.doc(description="""Get specific collections from the catalog into the stac-fastapi""")
     @api.expect(PublicCatalogsDto.start_stac_ingestion, validate=True)
@@ -235,12 +235,10 @@ class GetStacRecordsSpecifyingPublicCatalogId(Resource):
     def post(self, public_catalog_id):
         data = request.json
         try:
-            return (
-                public_catalogs_service.load_specific_collections_via_catalog_id(
-                    public_catalog_id, data
-                ),
-                200,
+            public_catalogs_service.load_specific_collections_via_catalog_id(
+                public_catalog_id, data
             )
+            return {"message": "Load started"}, 200
         except CatalogDoesNotExistError:
             return {"message": "Public catalog not found"}, 404
         except ConnectionError:
@@ -249,7 +247,7 @@ class GetStacRecordsSpecifyingPublicCatalogId(Resource):
                    }, 500
 
 
-@api.route("/<int:public_catalog_id>/items/update/")
+@api.route("/<int:public_catalog_id>/load/update/")
 class UpdateStacRecordsSpecifyingPublicCatalogId(Resource):
     @api.doc(description="""Get all stac records from a public catalog.""")
     @api.response(200, "Success")
@@ -259,9 +257,10 @@ class UpdateStacRecordsSpecifyingPublicCatalogId(Resource):
     )
     def get(self, public_catalog_id):
         try:
-            return public_catalogs_service.update_specific_collections_via_catalog_id(
+            public_catalogs_service.update_all_collections_via_catalog_id(
                 public_catalog_id
             )
+            return {"message": "Update started"}, 200
         except CatalogDoesNotExistError:
             return {"message": "Public catalog not found"}, 404
 
@@ -276,17 +275,10 @@ class UpdateStacRecordsSpecifyingPublicCatalogId(Resource):
     def post(self, public_catalog_id):
         collections_to_update = request.json["collections"]
         try:
-            result = public_catalogs_service.update_specific_collections_via_catalog_id(
+            public_catalogs_service.update_specific_collections_via_catalog_id(
                 public_catalog_id, collections_to_update
             )
-            response = []
-            for i in result:
-                response.append(
-                    {
-                        "message": i,
-                    }
-                )
-            return response, 200
+            return {"message": "Update started"}, 200
         except CatalogDoesNotExistError:
             return {"message": "Public catalog with specified id not found"}, 404
         except ConnectionError:
@@ -295,22 +287,16 @@ class UpdateStacRecordsSpecifyingPublicCatalogId(Resource):
                    }, 500
 
 
-@api.route("/items/update/")
+@api.route("/load/update-all/")
 class UpdateAllStacRecords(Resource):
     @api.doc(description="Update all stored stac records from all public catalogs")
     @auth_decorator.header_decorator(
         allowed_roles=["StacPortal.Creator"]
     )
     def get(self):
-        result = public_catalogs_service.update_all_stac_records()
-        response = []
-        for i in result:
-            response.append(
-                {
-                    "operation_number": i,
-                }
-            )
-        return response, 200
+        public_catalogs_service.update_all_stac_records()
+        return {"message": "Update started"}, 200
+
 
 
 @api.route("/sync/")
