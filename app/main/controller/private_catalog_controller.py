@@ -61,20 +61,3 @@ class CollectionGetCreateUpdate(Resource):
     )
     def get(self):
         return private_catalog_service.get_all_collections(), 200
-
-
-@api.route("/collections/<collection_id>/")
-class CollectionDelete(Resource):
-    @api.doc(description="Remove private collection by id")
-    @api.response(200, "Collection removed successfully.")
-    @api.response(404, "Collection not found")
-    @auth_decorator.header_decorator(
-        allowed_roles=["StacPortal.Creator"]
-    )
-    def delete(self, collection_id: str) -> Tuple[Dict[str, str], int]:
-        try:
-            return private_catalog_service.remove_collection(collection_id), 200
-        except PrivateCollectionDoesNotExistError:
-            return {
-                       "message": "Collection with this ID not found",
-                   }, 404

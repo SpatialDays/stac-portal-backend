@@ -31,14 +31,6 @@ def update_collection(collection: Dict[str, any]) -> Dict[str, any]:
         raise InvalidCollectionPayloadError
 
 
-def remove_collection(collection_id: str) -> Dict[str, any]:
-    try:
-        remove_collection_from_stac_api(collection_id)
-        return {"status": "success"}
-    except PrivateCollectionDoesNotExistError:
-        raise PrivateCollectionDoesNotExistError
-    except InvalidCollectionPayloadError:
-        raise InvalidCollectionPayloadError
 
 
 def get_all_collections():
