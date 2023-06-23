@@ -98,70 +98,7 @@ class PrivateCatalogDto:
             # ),
         },
     )
-    item_dto = api.model(
-        "item_dto",
-        {  # TODO: Check: Follow collection spec fully, recurse it all the way down
-            # Must follow https://github.com/radiantearth/stac-spec/blob/master/item-spec/item-spec.md
-            "type": fields.String(
-                required=True, description="Item type", example="Feature"
-            ),
-            "stac_version": fields.String(
-                required=True, description="stac version", example="1.0.0"
-            ),
-            "id": fields.String(
-                required=True,
-                description="item id",
-                example="LC08_L2SP_20210505_20210505_02_RT",
-            ),
-            "bbox": fields.List(
-                fields.Float,
-                required=False,
-                description="bbox",
-                example=[-180, -90, 180, 90],
-            ),
-            "geometry": fields.Nested(
-                api.model(
-                    "geometry",
-                    {
-                        "type": fields.String(
-                            required=True,
-                            description="geometry type",
-                            example="Polygon",
-                        ),
-                        "coordinates": fields.List(
-                            fields.List(fields.List(fields.Float)),
-                            required=True,
-                            description="geometry coordinates",
-                            example=[
-                                [
-                                    [-180, -90],
-                                    [-180, 90],
-                                    [180, 90],
-                                    [180, -90],
-                                    [-180, -90],
-                                ]
-                            ],
-                        ),
-                    },
-                ),
-                required=False,
-                description="geometry",
-            ),
-            "properties": fields.Nested(
-                api.model(
-                    "properties",
-                    {
-                        "datetime": fields.String(
-                            required=True,
-                            description="datetime",
-                            example="2021-05-05T00:00:00Z",
-                        )
-                    },
-                ),
-                required=True,
-            ),
-        },
-    )
+
 
 
 class ValidateDto:
@@ -349,6 +286,70 @@ class GdalInfoDto:
 
 class StacDto:
     api = Namespace("stac", description="stac related operations")
+    item_dto = api.model(
+        "item_dto",
+        {  # TODO: Check: Follow collection spec fully, recurse it all the way down
+            # Must follow https://github.com/radiantearth/stac-spec/blob/master/item-spec/item-spec.md
+            "type": fields.String(
+                required=True, description="Item type", example="Feature"
+            ),
+            "stac_version": fields.String(
+                required=True, description="stac version", example="1.0.0"
+            ),
+            "id": fields.String(
+                required=True,
+                description="item id",
+                example="LC08_L2SP_20210505_20210505_02_RT",
+            ),
+            "bbox": fields.List(
+                fields.Float,
+                required=False,
+                description="bbox",
+                example=[-180, -90, 180, 90],
+            ),
+            "geometry": fields.Nested(
+                api.model(
+                    "geometry",
+                    {
+                        "type": fields.String(
+                            required=True,
+                            description="geometry type",
+                            example="Polygon",
+                        ),
+                        "coordinates": fields.List(
+                            fields.List(fields.List(fields.Float)),
+                            required=True,
+                            description="geometry coordinates",
+                            example=[
+                                [
+                                    [-180, -90],
+                                    [-180, 90],
+                                    [180, 90],
+                                    [180, -90],
+                                    [-180, -90],
+                                ]
+                            ],
+                        ),
+                    },
+                ),
+                required=False,
+                description="geometry",
+            ),
+            "properties": fields.Nested(
+                api.model(
+                    "properties",
+                    {
+                        "datetime": fields.String(
+                            required=True,
+                            description="datetime",
+                            example="2021-05-05T00:00:00Z",
+                        )
+                    },
+                ),
+                required=True,
+            ),
+        },
+    )
 
 
 class StacGeneratorDto:
