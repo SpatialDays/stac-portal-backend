@@ -110,7 +110,7 @@ def _is_catalog_public_and_valid(url: str) -> bool:
     return True
 
 
-@cached(TTLCache(maxsize=1000, ttl=3600))  # does not cache when the threading is used
+# @cached(TTLCache(maxsize=1000, ttl=3600))  # does not cache when the threading is used
 def get_collections_for_public_catalog(public_catalog, spatial_extent, time_start, time_end):
     collections_url = urljoin(public_catalog.url + "/", 'collections')
     logging.info(f"Searching collections on {collections_url}")
@@ -138,7 +138,7 @@ def get_collections_for_public_catalog(public_catalog, spatial_extent, time_star
     return data
 
 
-# @cached(TTLCache(maxsize=1000, ttl=3600)) # TODO: Find a way to hash this output, this cant do it. Filehash probably can
+# #@cached(TTLCache(maxsize=1000, ttl=3600)) # TODO: Find a way to hash this output, this cant do it. Filehash probably can
 def search_collections(time_interval_timestamp: str, public_catalog_id: int = None,
                        spatial_extent_intersects: str or dict = None,
                        spatial_extent_bbox: list[float] = None):
@@ -157,7 +157,7 @@ def search_collections(time_interval_timestamp: str, public_catalog_id: int = No
     else:
         public_catalog_objects_to_search = PublicCatalog.query.all()
 
-    pool = Pool(8)  # You can specify the number of processes to use here. Default is CPU count.
+    pool = Pool()  # You can specify the number of processes to use here. Default is CPU count.
     data = []
     for public_catalog in public_catalog_objects_to_search:
         result = pool.apply_async(get_collections_for_public_catalog, args=(public_catalog, geom, time_start, time_end))
@@ -172,13 +172,14 @@ def search_collections(time_interval_timestamp: str, public_catalog_id: int = No
     catalog_names = {}
     for i in range(len(data)):
         if data[i]['parent_catalog'] not in catalog_names:
-            catalog_names[data[i]['parent_catalog']] = PublicCatalog.query.filter_by(id=data[i]['parent_catalog']).first().name
+            catalog_names[data[i]['parent_catalog']] = PublicCatalog.query.filter_by(
+                id=data[i]['parent_catalog']).first().name
 
         data[i]['parent_catalog_name'] = catalog_names[data[i]['parent_catalog']]
     return data
 
 
-@cached(TTLCache(maxsize=1000, ttl=3600))
+# @cached(TTLCache(maxsize=1000, ttl=3600))
 def get_collections_from_public_catalog_id(public_catalog_id: int):
     catalog = PublicCatalog.query.filter_by(id=public_catalog_id).first()
     catalog_url = catalog.url
@@ -186,7 +187,7 @@ def get_collections_from_public_catalog_id(public_catalog_id: int):
     return get_collection(collections_url)
 
 
-@cached(TTLCache(maxsize=1000, ttl=3600))
+# @cached(TTLCache(maxsize=1000, ttl=3600))
 def get_collection(collections_url: str):
     logging.info(f"Getting collections from {collections_url}")
     headers = {
@@ -216,11 +217,12 @@ def get_collection(collections_url: str):
     return to_return
 
 
-# @cached(TTLCache(maxsize=1000, ttl=3600))
+# #@cached(TTLCache(maxsize=1000, ttl=3600))
 def get_all_available_public_collections():
     all_public_catalogs = PublicCatalog.query.all()
+    logging.info(f"Found {len(all_public_catalogs)} public catalogs - searching collections")
     out = []
-    pool = Pool(8)  # You can specify the number of processes to use here. Default is CPU count.
+    pool = Pool()  # You can specify the number of processes to use here. Default is CPU count.
 
     def handle_result(result, public_catalog_id):
         for i in result:
@@ -487,7 +489,7 @@ def _run_ingestion_task_force_update(
             used_search_parameters = json.loads(i.used_search_parameters)
             catalog_url = PublicCatalog.query.filter_by(id=i.associated_catalog_id).first().url
             microservice_response = _call_ingestion_microservice(
-                used_search_parameters, source_stac_catalog_url= catalog_url, update=True)
+                used_search_parameters, source_stac_catalog_url=catalog_url, update=True)
             responses_from_ingestion_microservice.append(
                 microservice_response)
         except ValueError:
@@ -527,7 +529,6 @@ def run_search_parameters(parameter_id: int) -> int:
     if stored_search_parameters is None:
         raise StoredSearchParametersDoesNotExistError
     used_search_parameters = json.loads(stored_search_parameters.used_search_parameters)
-    microservice_response = _call_ingestion_microservice(used_search_parameters, PublicCatalog.query.filter_by(id=stored_search_parameters.associated_catalog_id).first().url ,update=True)
+    microservice_response = _call_ingestion_microservice(used_search_parameters, PublicCatalog.query.filter_by(
+        id=stored_search_parameters.associated_catalog_id).first().url, update=True)
     return microservice_response
-
-
