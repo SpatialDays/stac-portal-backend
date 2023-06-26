@@ -157,7 +157,7 @@ def search_collections(time_interval_timestamp: str, public_catalog_id: int = No
     else:
         public_catalog_objects_to_search = PublicCatalog.query.all()
 
-    pool = Pool()  # You can specify the number of processes to use here. Default is CPU count.
+    pool = Pool(8)  # You can specify the number of processes to use here. Default is CPU count.
     data = []
     for public_catalog in public_catalog_objects_to_search:
         result = pool.apply_async(get_collections_for_public_catalog, args=(public_catalog, geom, time_start, time_end))
@@ -169,6 +169,12 @@ def search_collections(time_interval_timestamp: str, public_catalog_id: int = No
     logging.info(f"Found {len(data)} collections")
     # order data by public_catalog key value
     data = sorted(data, key=lambda k: k['parent_catalog'])
+    catalog_names = {}
+    for i in range(len(data)):
+        if data[i]['parent_catalog'] not in catalog_names:
+            catalog_names[data[i]['parent_catalog']] = PublicCatalog.query.filter_by(id=data[i]['parent_catalog']).first().name
+
+        data[i]['parent_catalog_name'] = catalog_names[data[i]['parent_catalog']]
     return data
 
 
@@ -210,11 +216,11 @@ def get_collection(collections_url: str):
     return to_return
 
 
-@cached(TTLCache(maxsize=1000, ttl=3600))
+# @cached(TTLCache(maxsize=1000, ttl=3600))
 def get_all_available_public_collections():
     all_public_catalogs = PublicCatalog.query.all()
     out = []
-    pool = Pool()  # You can specify the number of processes to use here. Default is CPU count.
+    pool = Pool(8)  # You can specify the number of processes to use here. Default is CPU count.
 
     def handle_result(result, public_catalog_id):
         for i in result:
