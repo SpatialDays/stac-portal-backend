@@ -13,4 +13,5 @@ COPY . .
 EXPOSE 5000
 #CMD ["gunicorn", "-b", ":5000","--timeout","0", "manage:app"]
 ENTRYPOINT ["./entrypoint.sh"]
-CMD ["gunicorn", "--config", "gunicorn.py", "manage:app"]
+# CMD ["gunicorn", "--config", "gunicorn.py", "manage:app"]
+CMD ["python3", "pywsgi.py"]

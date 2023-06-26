@@ -23,7 +23,7 @@ from ..custom_exceptions import *
 from ..model.public_catalogs_model import StoredSearchParameters
 from ..util import process_timestamp
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 
 def store_new_public_catalog(name: str, url: str, description: str) -> PublicCatalog:
