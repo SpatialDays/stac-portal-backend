@@ -1,0 +1,106 @@
+version: '3'
+services:
+  stac-portal-backend:
+    container_name: stac-portal-backend
+    build:
+      context: .
+      dockerfile: Dockerfile
+    platform: linux/amd64
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_HOST=portal-database
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASS=postgres
+      - POSTGRES_DBNAME=stacportaldb
+      - READ_STAC_API_SERVER=http://stac-fastapi:8082
+      - WRITE_STAC_API_SERVER=http://stac-fastapi:8082
+      - REDIS_HOST=redis-server
+      - REDIS_PORT=6379
+    ports:
+      - "5000:5000"
+    depends_on:
+      - portal-database
+      - stac-fastapi
+      - redis-server
+    command: >
+      bash -c "sleep 5 && FLASK_DEBUG=1 FLASK_APP=manage.py FLASK_ENV=dev python3 manage.py run -h 0.0.0.0 -p 5000"
+    volumes:
+      - ./:/app
+
+  portal-database:
+    container_name: stac-portal-backend-postgis-database
+    image: postgis/postgis:13-3.1
+    platform: linux/amd64
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: stacportaldb
+  
+  stac-database:
+    container_name: stac-portal-backend-stac-database
+    image: ghcr.io/stac-utils/pgstac:v0.7.1
+    environment:
+      - POSTGRES_USER=username
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=postgis
+      - PGUSER=username
+      - PGPASSWORD=password
+      - PGDATABASE=postgis
+    command: postgres -N 500
+
+  stac-fastapi:
+    container_name: stac-portal-backend-stac-fastapi
+    image: oseoinfraacrstaging.azurecr.io/stac-fastapi:6b24dbc
+    platform: linux/amd64
+    environment:
+      - APP_HOST=0.0.0.0
+      - APP_PORT=8082
+      - RELOAD=true
+      - ENVIRONMENT=local
+      - POSTGRES_USER=username
+      - POSTGRES_PASS=password
+      - POSTGRES_DBNAME=postgis
+      - POSTGRES_HOST_READER=stac-database
+      - POSTGRES_HOST_WRITER=stac-database
+      - POSTGRES_PORT=5432
+      - WEB_CONCURRENCY=10
+      - VSI_CACHE=TRUE
+      - GDAL_HTTP_MERGE_CONSECUTIVE_RANGES=YES
+      - GDAL_DISABLE_READDIR_ON_OPEN=EMPTY_DIR
+      - DB_MIN_CONN_SIZE=1
+      - DB_MAX_CONN_SIZE=1
+      - USE_API_HYDRATE=${USE_API_HYDRATE:-false}
+    ports:
+      - "8082:8082"
+    volumes:
+      - ./stac_fastapi:/app/stac_fastapi
+      - ./scripts:/app/scripts
+    depends_on:
+      - stac-database
+    command: >
+     bash -c "sleep 15 && python -m stac_fastapi.pgstac.app"
+  stac-fastapi-selective-ingester:
+    container_name: stac-fastapi-selective-ingester
+    image: oseoinfraacrstaging.azurecr.io/stac-api-selective-ingester:7f8170d
+    platform: linux/amd64
+    environment:
+      - REDIS_HOST=redis-server
+      - REDIS_PORT=6379
+    depends_on:
+      - stac-portal-backend
+      - stac-fastapi
+      - redis-server
+
+  redis-server:
+    image: redis:6.2.5
+    platform: linux/amd64
+    volumes:
+      - redis-data:/data
+    ports:
+      - "16379:6379"
+    command: redis-server
+
+volumes:
+  redis-data:

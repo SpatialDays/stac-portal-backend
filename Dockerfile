@@ -1,6 +1,6 @@
 # This Dockerfile builds the API only.
 
-FROM python:3.9.5
+FROM python:3.10
 WORKDIR /app
 RUN python --version
 RUN pip3 --version
@@ -13,4 +13,5 @@ COPY . .
 EXPOSE 5000
 #CMD ["gunicorn", "-b", ":5000","--timeout","0", "manage:app"]
 ENTRYPOINT ["./entrypoint.sh"]
-CMD ["gunicorn", "--config", "gunicorn.py", "manage:app"]
+# CMD ["gunicorn", "--config", "gunicorn.py", "manage:app"]
+CMD ["python3", "pywsgi.py"]
