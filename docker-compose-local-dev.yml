@@ -17,6 +17,7 @@ services:
       - READ_STAC_API_SERVER=http://stac-fastapi:8082
       - WRITE_STAC_API_SERVER=http://stac-fastapi:8082
       - REDIS_HOST=redis-server
+      - REDIS_PORT=6379
     ports:
       - "5000:5000"
     depends_on:
@@ -80,7 +81,18 @@ services:
       - stac-database
     command: >
      bash -c "sleep 15 && python -m stac_fastapi.pgstac.app"
-  
+  stac-fastapi-selective-ingester:
+    container_name: stac-fastapi-selective-ingester
+    image: oseoinfraacrstaging.azurecr.io/stac-api-selective-ingester:7f8170d
+    platform: linux/amd64
+    environment:
+      - REDIS_HOST=redis-server
+      - REDIS_PORT=6379
+    depends_on:
+      - stac-portal-backend
+      - stac-fastapi
+      - redis-server
+
   redis-server:
     image: redis:6.2.5
     platform: linux/amd64

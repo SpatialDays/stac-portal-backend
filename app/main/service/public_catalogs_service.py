@@ -6,6 +6,7 @@ import urllib
 from threading import Thread
 from typing import Dict, List
 from urllib.parse import urljoin
+from gevent.threadpool import ThreadPool
 
 import gevent
 import redis
@@ -13,7 +14,7 @@ import requests
 import shapely
 import sqlalchemy
 from flask import current_app
-from gevent.threadpool import ThreadPool
+
 from shapely.geometry import box, shape
 from stac_collection_search import search_collections_verbose as search_collections_on_stac_api
 
@@ -24,7 +25,7 @@ from ..model.public_catalogs_model import PublicCatalog
 from ..model.public_catalogs_model import StoredSearchParameters
 from ..util import process_timestamp
 
-_num_workers = (multiprocessing.cpu_count() * 2) + 1
+
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -138,6 +139,7 @@ def get_collections_for_public_catalog(public_catalog, spatial_extent, time_star
     for result in results:
         result['parent_catalog'] = public_catalog.id
         data.append(result)
+    logging.info(f"Found {len(data)} collections on {collections_url}")
     return data
 
 
@@ -160,19 +162,19 @@ def search_collections(time_interval_timestamp: str, public_catalog_id: int = No
     else:
         public_catalog_objects_to_search = PublicCatalog.query.all()
 
-    # pool = Pool(0)  # You can specify the number of processes to use here. Default is CPU count.
-    pool = ThreadPool(_num_workers)
-    greenlets = []
-    data = []
-
     def handle_result(result, public_catalog_id):
-       for i in result:
+        for i in result:
            i["parent_catalog"] = public_catalog_id
            data.append(i)
 
+    greenlets = []
+    data = []
+    _pool = current_app._get_current_object().pool
+    # _pool = ThreadPool(1000)
     for public_catalog in public_catalog_objects_to_search:
-        greenlet = pool.apply_async(get_collections_for_public_catalog,
-                                    args=(public_catalog, geom, time_start, time_end),
+        logging.info(f"Searching collections for {public_catalog.name}")
+        greenlet = _pool.apply_async(get_collections_for_public_catalog,
+                                    args=(public_catalog, geom, time_start, time_end,),
                                     callback=functools.partial(handle_result, public_catalog_id=public_catalog.id))
         greenlets.append(greenlet)
 
@@ -232,8 +234,8 @@ def get_collection(collections_url: str):
 def get_all_available_public_collections():
     all_public_catalogs = PublicCatalog.query.all()
     out = []
-    # pool =  Pool() # You can specify the number of processes to use here. Default is CPU count.
-    pool = ThreadPool(_num_workers)
+    # _pool =  Pool() # You can specify the number of processes to use here. Default is CPU count.
+    _pool = current_app._get_current_object().pool
 
     def handle_result(result, public_catalog_id):
         for i in result:
@@ -249,7 +251,7 @@ def get_all_available_public_collections():
         if not public_catalog_url.endswith('/'):
             public_catalog_url = public_catalog_url + '/'
         collections_url = urllib.parse.urljoin(public_catalog_url, 'collections')
-        greenlet = pool.apply_async(get_collection, args=(collections_url,),
+        greenlet = _pool.apply_async(get_collection, args=(collections_url,),
                                     callback=functools.partial(handle_result, public_catalog_id=public_catalog.id))
         greenltes.append(greenlet)
 
