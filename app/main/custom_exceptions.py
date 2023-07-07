@@ -9,8 +9,10 @@ class StoredSearchParametersDoesNotExistError(Error):
 class CatalogDoesNotExistError(Error):
     pass
 
+
 class PublicCatalogNotPublicOrValidError(Error):
     pass
+
 
 class PublicCatalogDoesNotExistError(CatalogDoesNotExistError):
     pass
@@ -20,15 +22,7 @@ class CatalogAlreadyExistsError(Error):
     pass
 
 
-class MicroserviceIsNotAvailableError(Error):
-    pass
-
-
 class ConvertingTimestampError(Error):
-    pass
-
-
-class TemporalExtentError(Error):
     pass
 
 
@@ -48,19 +42,11 @@ class CollectionDoesNotExistError(Error):
     pass
 
 
-class PublicCollectionDoesNotExistError(CollectionDoesNotExistError):
-    pass
-
-
 class PrivateCollectionDoesNotExistError(CollectionDoesNotExistError):
     pass
 
 
 class ItemAlreadyExistsError(Error):
-    pass
-
-
-class PrivateItemAlreadyExistsError(ItemAlreadyExistsError):
     pass
 
 
