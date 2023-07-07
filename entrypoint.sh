@@ -1,6 +1,6 @@
 #!/bin/bash
-sleep 5
 set -e
+
 
 # Check that all required environment variables are set
 if [ -z "$POSTGRES_USER" ] || [ -z "$POSTGRES_PASS" ] || [ -z "$POSTGRES_DBNAME" ] || [ -z "$POSTGRES_HOST" ] || [ -z "$POSTGRES_PORT" ]; then
@@ -22,6 +22,8 @@ echo "PostGIS extension installation complete."
 
 cat << EOF > setup-database.py
 import os
+from time import sleep
+sleep(5)
 
 from flask_cli import FlaskGroup
 from flask_cors import CORS
