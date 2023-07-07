@@ -61,7 +61,7 @@ snuggs==1.4.7
 SQLAlchemy==1.4.41
 tomli==2.0.1
 typing-extensions==4.3.0
-Werkzeug==2.2.2
+Werkzeug==2.2.3
 wrapt==1.14.1
 xmltodict==0.13.0
 zipp==3.8.1
