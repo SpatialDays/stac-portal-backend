@@ -9,6 +9,7 @@ from .main.controller.stac_generator_controller import api as stac_generator_ns
 from .main.controller.status_reporting_controller import api as status_controller_ns
 from .main.controller.validate_controller import api as validate_ns
 from .main.controller.apim_controller import api as apim_ns
+from .main.controller.transformer_controller import api as transformer_ns
 
 blueprint = Blueprint('api', __name__)
 
@@ -25,3 +26,4 @@ api.add_namespace(file_ns, path='/file')
 api.add_namespace(stac_generator_ns, path='/stac_generator')
 api.add_namespace(stac_ns, path='/stac')
 api.add_namespace(apim_ns, path='/apim')
+api.add_namespace(transformer_ns, path='/transform')

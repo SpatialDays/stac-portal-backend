@@ -267,6 +267,19 @@ class FileDto:
     api = Namespace("files", description="File upload related operations")
 
 
+class TransformerDto:
+    api = Namespace("transformer", description="Transformer related operations")
+    transformer_dto = api.model(
+        "transformer_dto",
+        {
+            "output_epsg": fields.Integer(
+                required=True,
+                description="The EPSG code for the desired output spatial reference system."
+            )
+        }
+    )
+
+
 class StacDto:
     api = Namespace("stac", description="stac related operations")
     item_dto = api.model(
