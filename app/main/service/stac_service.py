@@ -110,10 +110,7 @@ def update_existing_collection_on_stac_api(
     elif response.status_code == 404:
         if "collection" in response.json()["description"].lower() \
                 and "does not exist" in response.json()["description"].lower():
-            raise CollectionAlreadyExistsError
-        elif "item" in response.json()["description"].lower() \
-                and "does not exist" in response.json()["description"].lower():
-            raise ItemDoesNotExistError
+            raise CollectionDoesNotExistError
     else:
         resp = response.json()
         resp["error_code"] = response.status_code
