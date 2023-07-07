@@ -11,7 +11,8 @@ def add_collection(collection: Dict[str, any]) -> Dict[str, any]:
     try:
         collection["stac_extensions"] = ["https://raw.githubusercontent.com/SpatialDays/sd-stac-extensions/main/spatialdays-stac-portal-metadata/v0.0.1/schema.json"]
         collection["stac-portal-metadata"] = {
-            "type-of-collection": "private"
+            "type-of-collection": "private",
+            "is-authoritative": False,
         }
         status = create_new_collection_on_stac_api(collection)
         return status

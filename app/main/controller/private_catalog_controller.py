@@ -1,3 +1,5 @@
+import logging
+logging.basicConfig(level=logging.DEBUG)
 from typing import Tuple, Dict
 
 from flask import request

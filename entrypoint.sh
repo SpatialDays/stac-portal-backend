@@ -1,5 +1,5 @@
 #!/bin/bash
-
+sleep 5
 set -e
 
 # Check that all required environment variables are set
