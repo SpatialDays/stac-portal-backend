@@ -350,3 +350,7 @@ class StacGeneratorDto:
 
 class APIMDto:
     api = Namespace('apim', description='apim related operations')
+
+
+class WMTSDto:
+    api = Namespace('wmts', description='wmts related operations')
