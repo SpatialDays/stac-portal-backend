@@ -10,46 +10,39 @@ auth_decorator = AuthDecorator()
 api = WMTSDto.api
 
 
-@api.route("/")
+@api.route("/<string:collection_id>/items/<string:item_id>/")
 class GetWMTSUrlsForItem(Resource):
     @api.doc(description="Get a WMTS urls for a given item")
     @api.response(200, "Success")
     @auth_decorator.header_decorator(
         allowed_roles=["StacPortal.Viewer", "StacPortal.Creator"]
     )
-    def get(self, oid: str, preferred_username: str, name: str):
-        logging.info("Getting WMTS urls for item")
-        collection_id = "landsat-c2-l2"
-        item_id = "LC09_L2SP_203024_20230703_02_T1"
+    def get(self, collection_id: str, item_id:str, oid: str = None, preferred_username: str = None, name: str = None):
+        logging.debug(f"Getting WMTS urls for item {item_id} in collection {collection_id}")
         secret = None
         if current_app.config["AD_ENABLE_AUTH"]:
+            if not any([oid, preferred_username, name]):
+                return {"message": "Auth is enabled, but no user info was provided"}, 401
             try:
+                logging.debug("Getting subscription secrets for user")
                 secrets = get_subscription_secrets_for_user(oid)
             except APIMSubscriptionNotFoundError:
-                try:
-                    get_user_from_apim(oid)
-                except APIMUserNotFoundError:
-                    first_name = name.split(" ")[0]
-                    last_name = "".join(name.split(" ")[1:])
-                    try:
-                        create_user_on_apim(oid, preferred_username, first_name, last_name)
-                    except APIMUserCreationError:
-                        return {"message": "Error creating user on APIM"}, 500
+                return {"message": "You need to create an API key first to access this resource"}, 401
 
-                try:
-                    make_subscription_for_user_on_all_apis(oid)
-                    secrets = get_subscription_secrets_for_user(oid)
-                except APIMSubscriptionCreationError:
-                    return {"message": "Error creating subscription on APIM"}, 500
-
-            secret = secrets["secrets"]["primaryKey"]
+            secret = secrets["primaryKey"]
         if not secret:
-            return get_all_wmts_urls_for_item(collection_id, item_id)
+            try:
+                return get_all_wmts_urls_for_item(collection_id, item_id)
+            except CollectionDoesNotExistError:
+                return {"message": "Collection does not exist"}, 404
+            except ItemDoesNotExistError:
+                return {"message": "Item does not exist"}, 404
+
         else:
-            rewriten_urls = {}
+            rewritten_urls = {}
             for key, value in get_all_wmts_urls_for_item(collection_id, item_id).items():
-                rewriten_urls[key] = value + f"&subscription-key={secret}"
-            return rewriten_urls
+                rewritten_urls[key] = value + f"&subscription-key={secret}"
+            return rewritten_urls
 
 
 
