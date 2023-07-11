@@ -1,11 +1,9 @@
-from typing import Dict, Tuple
+from typing import Dict
 from urllib.parse import urljoin
 
 import requests
-from flask import Response
 from flask import current_app
 
-from . import public_catalogs_service
 from ..custom_exceptions import *
 
 
@@ -64,12 +62,12 @@ def get_item_from_collection(
         collection_json = response.json()
         return collection_json
     elif response.status_code == 404:
-        if "collection" in response.json()["description"].lower() and \
-                "does not exist" in response.json()["description"].lower():
-            raise CollectionDoesNotExistError
-        elif "item" in response.json()["description"].lower() and \
+        if "item" in response.json()["description"].lower() and \
                 "does not exist" in response.json()["description"].lower():
             raise ItemDoesNotExistError
+        elif "collection" in response.json()["description"].lower() and \
+                "does not exist" in response.json()["description"].lower():
+            raise CollectionDoesNotExistError
     elif response.status_code == 424:
         raise CollectionDoesNotExistError
     else:

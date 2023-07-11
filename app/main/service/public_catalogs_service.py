@@ -211,22 +211,7 @@ def get_collection(collections_url: str):
     collections = response_result['collections']
     to_return = []
     for collection in collections:
-        spatial_extent = shapely.geometry.MultiPolygon([
-            shapely.geometry.box(*spatial_extent)
-            for spatial_extent in collection["extent"]["spatial"]["bbox"]
-        ])
-
-        to_return.append(
-            {
-                "id": collection["id"],
-                "title": collection["title"],
-                "type": collection["type"] if "type" in collection else "Collection",
-                "description": collection["description"],
-                "temporal_extent_start": collection["extent"]["temporal"]["interval"][0][0],
-                "temporal_extent_end": collection["extent"]["temporal"]["interval"][-1][1],
-                "spatial_extent_wkt": spatial_extent.wkt
-            }
-        )
+        to_return.append(collection)
     return to_return
 
 
