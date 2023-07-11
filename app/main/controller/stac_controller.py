@@ -1,5 +1,5 @@
 from flask_restx import Resource
-
+from typing import Tuple
 from ..aad.auth_decorators import AuthDecorator
 from ..service.stac_service import *
 from ..util.dto import StacDto
